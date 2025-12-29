@@ -1,6 +1,129 @@
 let db = [], fCuadraActiva = null, sugIdx = -1;
 let capR = L.layerGroup(), capE = L.layerGroup(), capC = L.layerGroup();
 
+const mapasBase = {
+    'osm': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap'
+    }),
+    'carto_light': L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; CARTO'
+    }),
+    // REEMPLAZO DE GCBA: Mapa Oficial del Instituto Geográfico Nacional (IGN)
+    'ign': L.tileLayer('https://wms.ign.gob.ar/geoserver/gwc/service/tms/1.0.0/capabaseargenmap@EPSG%3A3857@png/{z}/{x}/{-y}.png', {
+        attribution: '&copy; Instituto Geográfico Nacional',
+        minZoom: 3,
+        maxZoom: 18
+    }),
+    // GOOGLE STREETS (Solo dibujo/callejero)
+    'google_streets': L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+        maxZoom: 20,
+        subdomains: ['mt0','mt1','mt2','mt3'],
+        attribution: '&copy; Google Maps'
+    })
+};
+
+// Objeto único de colores (Global)
+const coloresPuntos = {
+    'VERDE': '#0eb654',      // Verde
+    'LATERAL': '#ff1900',    // Rojo
+    'BILATERAL': '#ff8800',  // Naranja (Ajustado según tu código hex)
+    'SOTERRADO': '#ffcc00'  // Amarillo
+    //'CESTO': '#000000'       // Negro
+};
+
+// Objeto para almacenar las capas
+let capasContenedores = {
+    verdes: null,
+    laterales: null,
+    bilaterales: null,
+    soterrados: null
+    //cestos: null
+};
+
+// Diccionario para vincular ID de HTML con nombre de capa
+const mappingChecks = {
+    'check-verdes': 'verdes',
+    'check-laterales': 'laterales',
+    'check-bilaterales': 'bilaterales',
+    'check-soterrados': 'soterrados'
+    //'check-cestos': 'cestos'
+};
+
+function inicializarCapasPuntos() {
+    const crearEstiloPunto = (color) => ({
+        radius: 5,
+        fillColor: color,
+        color: "#fff",
+        weight: 1,
+        opacity: 1,
+        fillOpacity: 0.9
+    });
+
+    const crearContenidoPopup = (f) => {
+        const p = f.properties;
+        return `<div style="font-size:11px; font-family: Arial;">
+                <b style="color:#333; border-bottom:1px solid #eee; display:block; margin-bottom:4px;">DATOS DEL EQUIPO</b>
+                <b>ID:</b> ${p.ID_EQUIPO || 'S/D'}<br>
+                <b>Calle:</b> ${p.CALLE || 'S/D'}<br>
+                <b>Altura:</b> ${p.ALTURA || 'S/D'}<br>
+                <b>Tipo:</b> ${p.COD_EQUIPA || 'VERDE'}<br>
+                <b>Ubicación:</b> ${p.UBICACIÓN || 'S/D'}
+            </div>`;
+    };
+
+    // 1. Procesar VERDES
+    if (window.Verdes) {
+        capasContenedores.verdes = L.geoJSON(window.Verdes, {
+            pointToLayer: (f, latlng) => L.circleMarker(latlng, crearEstiloPunto(coloresPuntos.VERDE)).bindPopup(crearContenidoPopup(f))
+        });
+    }
+
+    // 2. Procesar PR
+    if (window.PR) {
+        const crearCapaFiltrada = (valorFiltro, color) => {
+            return L.geoJSON(window.PR, {
+                filter: (f) => (f.properties.COD_EQUIPA || "").toString().trim().toUpperCase() === valorFiltro,
+                pointToLayer: (f, latlng) => L.circleMarker(latlng, crearEstiloPunto(color)).bindPopup(crearContenidoPopup(f))
+            });
+        };
+
+        capasContenedores.laterales = crearCapaFiltrada('LATERAL', coloresPuntos.LATERAL);
+        capasContenedores.bilaterales = crearCapaFiltrada('BILATERAL', coloresPuntos.BILATERAL);
+        capasContenedores.soterrados = crearCapaFiltrada('SOTERRADO', coloresPuntos.SOTERRADO);
+        //capasContenedores.cestos = crearCapaFiltrada('CESTO', coloresPuntos.CESTO);
+    }
+
+    // 3. Vincular Eventos
+    const mapping = { 'check-verdes': 'verdes', 'check-laterales': 'laterales', 'check-bilaterales': 'bilaterales', 'check-soterrados': 'soterrados', 'check-cestos': 'cestos' };
+    Object.keys(mapping).forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('change', function() {
+                const capa = capasContenedores[mapping[id]];
+                if (capa) this.checked ? map.addLayer(capa) : map.removeLayer(capa);
+            });
+        }
+    });
+}
+
+// Ejecutar cuando el mapa esté listo
+document.addEventListener('DOMContentLoaded', () => {
+    // Asegúrate de que tu objeto 'map' ya esté creado aquí
+    inicializarCapasPuntos();
+});
+
+// Asignar los eventos
+Object.keys(mappingChecks).forEach(id => {
+    document.getElementById(id).addEventListener('change', function(e) {
+        const capaKey = mappingChecks[id];
+        if (e.target.checked) {
+            capasContenedores[capaKey].addTo(map);
+        } else {
+            map.removeLayer(capasContenedores[capaKey]);
+        }
+    });
+});
+
 // 1. Procesar Datos Operativos
 try {
     const l = datosCrudos.trim().split(/\r?\n/);
@@ -14,8 +137,27 @@ try {
 
 // 2. Inicializar Mapa
 const map = L.map('map').setView([-34.63, -58.36], 13);
-// ORIGINAL
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+// Variable para rastrear la capa actual
+let capaBaseActual = mapasBase['osm'];
+
+// 2. Inicializar el mapa con la capa por defecto
+capaBaseActual.addTo(map);
+
+// 3. Función para cambiar el mapa base
+// En el evento change del selector:
+document.getElementById('selector-mapa').addEventListener('change', function(e) {
+    const seleccion = e.target.value;
+    map.removeLayer(capaBaseActual);
+    
+    capaBaseActual = mapasBase[seleccion];
+    capaBaseActual.addTo(map);
+
+    // Si elegís GCBA, forzamos un re-dibujado para evitar que quede gris
+    if (seleccion === 'gcba') {
+        map.invalidateSize();
+    }
+});
+
 
 //version 2
 // L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
@@ -100,10 +242,9 @@ function limpiarCapas(rutas = true, cuadra = true) {
 }
 
 function getColor(id) {
-    const colors = ['#2ecc71','#e74c3c','#9b59b6','#f1c40f','#3498db','#e67e22','#1abc9c'];
     let hash = 0;
     for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
-    return colors[Math.abs(hash) % colors.length];
+    return coloresPuntos[Math.abs(hash) % coloresPuntos.length];
 }
 
 function dibujar(ids) {
@@ -286,7 +427,112 @@ function limpiarTodo() {
     ['dTur','dFre','dRut'].forEach(id=>document.getElementById(id).classList.add('hidden'));
 }
 
+function inicializarCapasPuntos() {
+    // Esta función interna asegura que el estilo use SIEMPRE los colores de tu constante global
+    const obtenerEstiloPunto = (tipo) => ({
+        radius: 5,
+        fillColor: coloresPuntos[tipo] || '#333333', // Usa el color del objeto global
+        color: "#fff",
+        weight: 1,
+        opacity: 1,
+        fillOpacity: 0.9
+    });
+
+    const crearContenidoPopup = (f) => {
+        const p = f.properties;
+        return `<div style="font-size:11px; font-family: Arial;">
+                <b style="color:#333; border-bottom:1px solid #eee; display:block; margin-bottom:4px;">DATOS DEL EQUIPO</b>
+                <b>ID:</b> ${p.ID_EQUIPO || 'S/D'}<br>
+                <b>Calle:</b> ${p.CALLE || 'S/D'}<br>
+                <b>Altura:</b> ${p.ALTURA || 'S/D'}<br>
+                <b>Tipo:</b> ${p.COD_EQUIPA || 'VERDE'}<br>
+                <b>Ubicación:</b> ${p.UBICACIÓN || 'S/D'}
+            </div>`;
+    };
+
+    // 1. Procesar VERDES
+    if (window.Verdes) {
+        capasContenedores.verdes = L.geoJSON(window.Verdes, {
+            pointToLayer: (f, latlng) => L.circleMarker(latlng, obtenerEstiloPunto('VERDE')).bindPopup(crearContenidoPopup(f))
+        });
+    }
+
+    // 2. Procesar PR (Laterales, Bilaterales, Soterrados, Cestos)
+    if (window.PR) {
+        const crearCapaFiltrada = (valorFiltro) => {
+            return L.geoJSON(window.PR, {
+                filter: (f) => {
+                    const valor = (f.properties.COD_EQUIPA || "").toString().trim().toUpperCase();
+                    return valor === valorFiltro;
+                },
+                pointToLayer: (f, latlng) => L.circleMarker(latlng, obtenerEstiloPunto(valorFiltro)).bindPopup(crearContenidoPopup(f))
+            });
+        };
+
+        capasContenedores.laterales = crearCapaFiltrada('LATERAL');
+        capasContenedores.bilaterales = crearCapaFiltrada('BILATERAL');
+        capasContenedores.soterrados = crearCapaFiltrada('SOTERRADO');
+        //capasContenedores.cestos = crearCapaFiltrada('CESTO');
+    }
+
+    // 3. Vincular Eventos a Checkboxes
+    const mapping = { 
+        'check-verdes': 'verdes', 
+        'check-laterales': 'laterales', 
+        'check-bilaterales': 'bilaterales', 
+        'check-soterrados': 'soterrados'
+        //'check-cestos': 'cestos' 
+    };
+
+    Object.keys(mapping).forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.onchange = function() {
+                const capa = capasContenedores[mapping[id]];
+                if (capa) {
+                    if (this.checked) {
+                        capa.addTo(map);
+                    } else {
+                        map.removeLayer(capa);
+                    }
+                }
+            };
+        }
+    });
+}
+
+// Función auxiliar para crear el círculo
+function crearMarcador(latlng, color) {
+    return L.circleMarker(latlng, {
+        radius: 6,
+        fillColor: color,
+        color: "#fff",
+        weight: 1,
+        opacity: 1,
+        fillOpacity: 0.9
+    });
+}
+
 function generarInforme() {
+    // 1. CAPTURA DE PUNTOS Y COLORES ACTIVOS
+    let puntosParaInforme = [];
+    let tiposActivosParaLeyenda = [];
+    const mappingNombres = { 
+        'verdes': 'VERDE', 
+        'laterales': 'LATERAL', 
+        'bilaterales': 'BILATERAL', 
+        'soterrados': 'SOTERRADO' 
+        //'cestos': 'CESTO' 
+    };
+
+    Object.keys(capasContenedores).forEach(key => {
+        if (capasContenedores[key] && map.hasLayer(capasContenedores[key])) {
+            puntosParaInforme.push(capasContenedores[key].toGeoJSON());
+            tiposActivosParaLeyenda.push(mappingNombres[key]);
+        }
+    });
+
+    // 2. CAPTURA DE CONTENIDO TÉCNICO
     const contenido = document.getElementById('sb-contenido');
     if (!contenido || !contenido.innerHTML.trim()) return alert("Seleccione algo para reportar.");
 
@@ -301,14 +547,32 @@ function generarInforme() {
     capR.eachLayer(l => capasActivas.push(l.toGeoJSON()));
     capC.eachLayer(l => capasActivas.push(l.toGeoJSON()));
 
+    // 3. GENERAR HTML DE LA LEYENDA (Usando coloresPuntos global)
+    let leyendaHTML = "";
+    if (tiposActivosParaLeyenda.length > 0) {
+        leyendaHTML = `
+            <div style="position: absolute; bottom: 15px; left: 15px; z-index: 1000; background: white; padding: 6px; border: 1.5px solid #000; font-size: 9px; font-family: Arial, sans-serif; min-width: 100px;">
+                <b style="border-bottom: 1px solid #ccc; display: block; margin-bottom: 4px; font-size: 8px; letter-spacing: 0.5px;">REFERENCIAS</b>
+                ${tiposActivosParaLeyenda.map(tipo => `
+                    <div style="display: flex; align-items: center; margin-bottom: 3px;">
+                        <div style="width: 10px; height: 10px; background: ${coloresPuntos[tipo]}; border: 1px solid #fff; border-radius: 50%; margin-right: 7px; box-shadow: 0 0 1px #000;"></div>
+                        <span style="font-weight: bold; color: #333;">${tipo}</span>
+                    </div>
+                `).join('')}
+            </div>`;
+    }
+
     const ventana = window.open('', 'Reporte', 'width=900,height=1100');
     let htmlContent = "";
 
+    // 4. CONSTRUCCIÓN DEL LAYOUT (RUTA O CUADRA)
     if (esRuta) {
-        // --- INFORME DE RUTA: AJUSTE DE ÁREA IMPRIMIBLE ---
         htmlContent = `
             <div class="a4-page ruta-layout">
-                <div id="map-static" class="map-ruta"></div>
+                <div style="position: relative; width: 100%; flex-shrink: 0;">
+                    <div id="map-static" class="map-ruta"></div>
+                    ${leyendaHTML}
+                </div>
                 <div class="info-container">
                     <h2 class="report-title">DETALLE TÉCNICO DE RUTA</h2>
                     <table class="ruta-table">
@@ -318,7 +582,6 @@ function generarInforme() {
                 <div class="footer-stamp">Generado el: ${new Date().toLocaleString()}</div>
             </div>`;
     } else {
-        // --- INFORME DE CUADRA (CON MARGEN DE SEGURIDAD) ---
         const calle = datosArray.find(d => d.label.includes("calle"))?.valor || "";
         const barrio = datosArray.find(d => d.label.includes("barrio"))?.valor || "";
         const comunaVal = datosArray.find(d => d.label.includes("comuna"))?.valor || "";
@@ -353,58 +616,42 @@ function generarInforme() {
         htmlContent = `
             <div class="a4-page" style="padding: 8mm;">
                 <h1 class="cuadra-title">${tituloCompleto}</h1>
-                <div id="map-static" class="map-cuadra"></div>
+                <div style="position: relative;">
+                    <div id="map-static" class="map-cuadra"></div>
+                    ${leyendaHTML}
+                </div>
                 <div class="servicios-grid">${listadoHTML}</div>
+                <div class="footer-stamp">Generado el: ${new Date().toLocaleString()}</div>
             </div>`;
     }
 
+    // 5. ESCRITURA DEL DOCUMENTO FINAL
     ventana.document.write(`
         <html>
         <head>
+            <title>Reporte de Gestión</title>
             <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
             <style>
                 @page { size: A4 portrait; margin: 0; }
                 body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #333; }
                 .toolbar { width: 100%; background: #000; padding: 10px; text-align: center; position: sticky; top: 0; z-index: 9999; }
                 .btn-print { padding: 10px 30px; background: #27ae60; color: white; border: none; cursor: pointer; font-weight: bold; border-radius: 4px; }
-                
-                /* AJUSTE DE ÁREA IMPRIMIBLE (Seguridad contra recortes) */
-                .a4-page { 
-                    width: 210mm; 
-                    height: 285mm; /* Bajamos de 297 a 285 para que entre en el área de impresión */
-                    background: white; 
-                    margin: 10px auto; 
-                    box-sizing: border-box; 
-                    position: relative;
-                    overflow: hidden;
-                }
-
-                /* Estilos Informe Ruta */
+                .a4-page { width: 210mm; height: 285mm; background: white; margin: 10px auto; box-sizing: border-box; position: relative; overflow: hidden; }
                 .ruta-layout { display: flex; flex-direction: column; padding: 10mm; }
-                .map-ruta { width: 100%; height: 220mm; border: 1px solid #000; flex-shrink: 0; }
-                .info-container { flex-grow: 1; margin-top: 10px; }
+                .map-ruta { width: 100%; height: 215mm; border: 1px solid #000; }
                 .report-title { font-size: 16px; text-align: center; border-bottom: 2px solid #000; padding-bottom: 5px; margin: 5px 0 10px 0; }
                 .ruta-table { width: 100%; border-collapse: collapse; }
                 .ruta-table td { border: 1px solid #ddd; padding: 6px; vertical-align: top; }
-                
-                /* Estilos Informe Cuadra */
                 .cuadra-title { font-size: 18px; text-align: center; border-bottom: 2px solid #000; padding-bottom: 5px; margin: 0 0 10px 0; }
                 .map-cuadra { width: 100%; height: 100mm; border: 1px solid #000; margin-bottom: 15px; }
                 .servicios-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-                .turno-block { margin-bottom: 5px; }
                 .turno-header { background: #333; color: white; font-size: 10px; padding: 3px 8px; font-weight: bold; }
                 .cuadra-table { width: 100%; border-collapse: collapse; font-size: 9px; border: 1px solid #ccc; }
                 .cuadra-table td { padding: 3px; border-bottom: 1px solid #eee; }
-
                 .label { display: block; font-size: 8px; font-weight: bold; color: #666; text-transform: uppercase; }
                 .value { font-size: 11px; font-weight: bold; }
                 .footer-stamp { position: absolute; bottom: 5mm; right: 10mm; font-size: 8px; color: #999; }
-
-                @media print { 
-                    .toolbar { display: none; } 
-                    body { background: white; } 
-                    .a4-page { margin: 0; border: none; box-shadow: none; height: 100vh; } 
-                }
+                @media print { .toolbar { display: none; } body { background: white; } .a4-page { margin: 0; border: none; box-shadow: none; height: 100vh; } }
             </style>
         </head>
         <body>
@@ -412,13 +659,61 @@ function generarInforme() {
             ${htmlContent}
             <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
             <script>
+                // Dentro de generarInforme, en ventana.document.write:
+
+                // Dentro de generarInforme (ventana.document.write)
                 const map = L.map('map-static', { zoomControl: false, dragging: false, scrollWheelZoom: false, attributionControl: false });
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+                const urlActual = '${capaBaseActual._url}';
+                const isGoogle = urlActual.includes('google');
+                const isIGN = urlActual.includes('ign.gob.ar');
+
+                L.tileLayer(urlActual, {
+                    subdomains: isGoogle ? ['mt0','mt1','mt2','mt3'] : ['a','b','c'],
+                    tms: isIGN, // El IGN también usa inversión de eje Y
+                    maxZoom: 18
+                }).addTo(map);
+
+                // LÍNEAS (Rojo) - Prioridad de Zoom
                 const geoData = ${JSON.stringify(capasActivas)};
                 if(geoData.length > 0) {
-                    const layer = L.geoJSON(geoData, { style: { color: "#e74c3c", weight: 10, opacity: 1 } }).addTo(map);
-                    map.fitBounds(layer.getBounds(), {padding: [${esRuta ? 40 : 150}, ${esRuta ? 40 : 150}]});
+                    const l = L.geoJSON(geoData, { style: { color: "#e74c3c", weight: 10, opacity: 1 } }).addTo(map);
+                    map.fitBounds(l.getBounds(), { padding: [${esRuta ? 40 : 150}, ${esRuta ? 40 : 150}] });
                 }
+
+                // PUNTOS (Contenedores) - Colores Globales y Popups
+                const puntosData = ${JSON.stringify(puntosParaInforme)};
+                const cols = ${JSON.stringify(coloresPuntos)};
+
+                puntosData.forEach(geojson => {
+                    L.geoJSON(geojson, {
+                        pointToLayer: (f, latlng) => {
+                            const p = f.properties;
+                            
+                            // Normalización de tipo (Si COD_EQUIPA no existe o es nulo, es VERDE)
+                            let cod = (p.COD_EQUIPA || "").toString().trim().toUpperCase();
+                            if (!cod) cod = 'VERDE';
+
+                            const popupHTML = \`
+                                <div style="font-size:10px; min-width:140px; font-family:Arial;">
+                                    <b style="color:#d35400; display:block; border-bottom:1px solid #eee; margin-bottom:3px;">DATOS EQUIPO</b>
+                                    <b>ID:</b> \${p.ID_EQUIPO || 'S/D'}<br>
+                                    <b>Calle:</b> \${p.CALLE || 'S/D'}<br>
+                                    <b>Altura:</b> \${p.ALTURA || 'S/D'}<br>
+                                    <b>Tipo:</b> \${cod}<br>
+                                    <b>Ubicación:</b> \${p.UBICACIÓN || 'S/D'}
+                                </div>\`;
+
+                            return L.circleMarker(latlng, {
+                                radius: 5,
+                                fillColor: cols[cod] || cols['VERDE'],
+                                color: "#fff",
+                                weight: 1,
+                                fillOpacity: 0.9
+                            }).bindPopup(popupHTML);
+                        }
+                    }).addTo(map);
+                });
             </script>
         </body>
         </html>
@@ -438,6 +733,5 @@ function generarInforme() {
     }
     ventana.document.close();
 }
-
 // Iniciar Combos al cargar
 initCombos();
