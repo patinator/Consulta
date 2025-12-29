@@ -46,6 +46,41 @@
             
             <!-- <button class="btn-action" style="background:var(--danger); margin-top:20px;" onclick="limpiarTodo()">LIMPIAR MAPA</button> -->
         </div>
+
+        <div class="layers-control-section" style="margin-top: 15px; padding: 12px; border-top: 1px solid #ddd; background: #fcfcfc;">
+            <h4 style="margin: 0 0 10px 0; font-size: 13px; color: #555; text-transform: uppercase; letter-spacing: 0.5px;">Mostrar contenedores</h4>
+            
+            <div class="check-group" style="display: flex; flex-direction: column; gap: 4px;">
+                <label class="check-container">
+                    <input type="checkbox" id="check-verdes" class="layer-check"> Verdes
+                </label>
+                <label class="check-container">
+                    <input type="checkbox" id="check-laterales" class="layer-check"> Laterales
+                </label>
+                <label class="check-container">
+                    <input type="checkbox" id="check-bilaterales" class="layer-check"> Bilaterales
+                </label>
+                <label class="check-container">
+                    <input type="checkbox" id="check-soterrados" class="layer-check"> Soterrados
+                </label>
+                
+                <!--<hr style="margin: 6px 0; border: 0; border-top: 1px solid #eee;">
+                
+                <label class="check-container" style="font-weight: 600;">
+                    <input type="checkbox" id="check-cestos" class="layer-check"> Cestos papeleros
+                </label>
+                -->
+            </div>
+        </div>
+        <div class="control-group">
+            <label for="selector-mapa" style="font-weight:bold; font-size:12px;">Mapa Base:</label>
+            <select id="selector-mapa" style="width:100%; padding:5px; margin-top:5px; font-size:12px;">
+                <option value="osm">OpenStreetMap</option>
+                <option value="carto_light">CartoDB Light</option>
+                <option value="ign">Mapa Oficial IGN</option>
+                <option value="google_streets">Google Maps (Planos)</option>
+            </select>
+        </div>
     </aside>
     
     <button class="toggle-btn btn-L" onclick="toggleL()">◀</button>
@@ -68,6 +103,8 @@
 <script src="Datos/Z7.js"></script>
 <script src="Datos/rutas.js"></script>
 <script src="Datos/datos_operativos.js"></script>
+<script src="Datos/Verdes.js"></script>
+<script src="Datos/PR.js"></script>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
