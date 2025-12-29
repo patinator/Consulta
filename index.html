@@ -2,44 +2,10 @@
 <html lang="es">
 <head>
     <meta charset="utf-8" />
-    <title>Sistema de Gestión de Rutas - v25.0</title>
+    <title>Sistema de Gestión de Rutas - v26.0</title>
+    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
-        /* ... (estilos anteriores) ... */
-        :root { --primary: #1a252f; --accent: #3498db; --bg: #f4f4f4; --danger: #e74c3c; --text: #2c3e50; }
-        body, html { margin: 0; padding: 0; height: 100vh; overflow: hidden; font-family: 'Segoe UI', sans-serif; background: var(--bg); }
-        .app-grid { display: grid; grid-template-columns: auto 1fr auto; height: 100vh; width: 100vw; }
-        .sidebar { background: white; height: 100vh; display: flex; flex-direction: column; box-shadow: 0 0 10px rgba(0,0,0,0.2); transition: width 0.3s ease; position: relative; z-index: 10; }
-        .sidebar-left { width: 320px; border-right: 1px solid #ccc; }
-        .sidebar-left.collapsed { width: 0; border: none; }
-        .sidebar-left.collapsed .info-scroll, .sidebar-left.collapsed .panel-header { opacity: 0; visibility: hidden; pointer-events: none; }
-        .sidebar-right { width: 0; overflow: hidden; }
-        .sidebar-right.active { width: 420px; border-left: 1px solid #ccc; }
-        #map { width: 100%; height: 100%; z-index: 1; }
-        .toggle-btn { position: absolute; top: 50%; transform: translateY(-50%); width: 28px; height: 60px; background: var(--primary); color: white; border: none; cursor: pointer; z-index: 3000; font-weight: bold; }
-        .btn-L { left: 320px; border-radius: 0 8px 8px 0; transition: left 0.3s ease; }
-        .sidebar-left.collapsed + .btn-L { left: 0; }
-        .btn-R { right: 0; border-radius: 8px 0 0 8px; transition: right 0.3s ease; }
-        .sidebar-right.active + .btn-R { right: 420px; }
-        .panel-header { background: var(--primary); color: white; padding: 15px; font-size: 13px; font-weight: bold; text-align: center; text-transform: uppercase; }
-        .info-scroll { flex: 1; overflow-y: auto; padding: 20px; min-width: 320px; box-sizing: border-box; }
-        .data-card { background: #f9f9f9; padding: 10px; border-radius: 4px; margin-bottom: 6px; border-left: 3px solid var(--accent); display: flex; justify-content: space-between; align-items: center; }
-        .data-card span { font-size: 9px; color: #7f8c8d; font-weight: bold; text-transform: uppercase; }
-        .data-card p { margin: 0; font-size: 12px; font-weight: 600; color: var(--text); }
-        .field-group { margin-bottom: 15px; }
-        label { font-size: 10px; font-weight: bold; color: #7f8c8d; display: block; margin-bottom: 4px; text-transform: uppercase; }
-        select, input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; box-sizing: border-box; }
-        .tech-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        .tech-table th { text-align: left; padding: 8px; border-bottom: 2px solid #eee; color: #888; font-size: 9px; }
-        .tech-table td { padding: 10px 8px; border-bottom: 1px solid #eee; font-size: 11px; cursor: pointer; }
-        .btn-action { width: 100%; padding: 12px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; background: var(--accent); color: white; }
-        .btn-back { background: #f8f9fa; border: 1px solid #ddd; padding: 10px; width: 100%; margin-bottom: 15px; cursor: pointer; font-weight: bold; color: var(--accent); border-radius: 4px; }
-        .suggestion-list { border: 1px solid #ccc; background: white; max-height: 150px; overflow-y: auto; position: absolute; width: calc(100% - 40px); z-index: 100; }
-        .suggestion-item { padding: 8px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #eee; }
-        .suggestion-item.active { background: #d4eafc; }
-        .ruta-label { background: white; border: 2px solid #333; padding: 2px 5px; font-weight: bold; font-size: 10px; }
-        .hidden { display: none; }
-    </style>
+    <link rel="stylesheet" href="CSS/estilos.css" />
 </head>
 <body>
 
@@ -49,21 +15,25 @@
         <div class="info-scroll">
             <div id="seccion-ruta-manual" class="field-group">
                 <label>1. Búsqueda por Ruta</label>
-                <input type="text" id="inRuta" placeholder="Ej: 1005..." 
-                       onfocus="limpiarCombos()" 
-                       onkeypress="if(event.key==='Enter') busquedaGlobal()">
+                <input type="text" id="inRuta" placeholder="Ej: 1005..." onfocus="limpiarCombos()" onkeypress="if(event.key==='Enter') busquedaGlobal()">
                 <button class="btn-action" onclick="busquedaGlobal()" style="background:var(--primary); margin-top:5px;">MOSTRAR RUTA</button>
             </div>
+            
             <hr style="border:0; border-top:1px solid #eee; margin:20px 0;">
             
             <div id="seccion-combos" class="field-group">
                 <label>2. Filtros de Servicio</label>
-                <div style="margin-bottom:10px;"><label style="display:inline; cursor:pointer"><input type="checkbox" id="checkCodigo" onchange="initCombos()" style="width:auto"> BUSCAR POR CÓDIGO</label></div>
+                <div style="margin-bottom:10px;">
+                    <label style="display:inline; cursor:pointer">
+                        <input type="checkbox" id="checkCodigo" onchange="initCombos()" style="width:auto"> BUSCAR POR CÓDIGO
+                    </label>
+                </div>
                 <select id="cbSrv" onfocus="limpiarBusquedaRuta()" onchange="manejarFiltros(event)"></select>
                 <div id="dTur" class="hidden" style="margin-top:10px;"><select id="cbTur" onchange="manejarFiltros(event)"></select></div>
                 <div id="dFre" class="hidden" style="margin-top:10px;"><select id="cbFre" onchange="manejarFiltros(event)"></select></div>
                 <div id="dRut" class="hidden" style="margin-top:10px;"><select id="cbRut" onchange="manejarFiltros(event)"></select></div>
             </div>
+            
             <hr style="border:0; border-top:1px solid #eee; margin:20px 0;">
             
             <div class="field-group">
@@ -71,268 +41,37 @@
                 <input type="text" id="inCalle" placeholder="Nombre de calle..." onfocus="limpiarTodoBusqueda()" oninput="sugerir(this.value)" onkeydown="navTeclado(event)">
                 <div id="sugList" class="suggestion-list hidden"></div>
                 <input type="number" id="inAlt" placeholder="Altura..." onkeypress="if(event.key==='Enter') buscarCuadra()" style="margin-top:10px;">
-                <button class="btn-action" onclick="buscarCuadra()" style="margin-top:5px;">ENFOCAR DIRECCIÓN</button>
+                <button class="btn-action" onclick="buscarCuadra()" style="margin-top:5px;">BUSCAR DIRECCIÓN</button>
             </div>
-            <button class="btn-action" style="background:var(--danger); margin-top:20px;" onclick="limpiarTodo()">LIMPIAR MAPA</button>
+            
+            <!-- <button class="btn-action" style="background:var(--danger); margin-top:20px;" onclick="limpiarTodo()">LIMPIAR MAPA</button> -->
         </div>
     </aside>
+    
     <button class="toggle-btn btn-L" onclick="toggleL()">◀</button>
+    
     <main id="map"></main>
+    
     <aside id="panel-der" class="sidebar sidebar-right">
         <div class="panel-header">Informe Técnico</div>
+        <div style="padding: 10px 20px 0 20px;">
+            <button id="btn-imprimir" class="btn-action" onclick="generarInforme()" style="background-color: #27ae60;">
+                GENERAR REPORTE
+            </button>
+        </div>
         <div id="sb-contenido" class="info-scroll"></div>
     </aside>
+    
     <button class="toggle-btn btn-R" onclick="toggleR()">◀</button>
 </div>
 
 <script src="Datos/Z7.js"></script>
 <script src="Datos/rutas.js"></script>
 <script src="Datos/datos_operativos.js"></script>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-<script>
-    let db = [], fCuadraActiva = null, sugIdx = -1;
-    let capR = L.layerGroup(), capE = L.layerGroup(), capC = L.layerGroup();
+<script src="JS/mapa.js"></script>
 
-    // Procesar base de datos
-    try {
-        const l = datosCrudos.trim().split(/\r?\n/);
-        const h = l[0].split(';');
-        db = l.slice(1).map(row => {
-            let o = {}, v = row.split(';');
-            h.forEach((name, i) => o[name.trim()] = v[i] ? v[i].trim() : "");
-            return o;
-        });
-    } catch(e) { console.error(e); }
-
-    const map = L.map('map').setView([-34.63, -58.36], 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
-    // 1. CARGA DE Z7.js COMO CAPA BASE PERMANENTE (No se incluye en limpiarCapas)
-    if (typeof Z7 !== 'undefined') {
-        L.geoJSON(Z7, {
-            style: { color: "#95a5a6", weight: 4, opacity: 0.4, fillOpacity: 0.25, interactive: false }
-        }).addTo(map);
-    }
-
-    // 2. RESTO DE CAPAS OPERATIVAS
-    capR.addTo(map); capE.addTo(map); capC.addTo(map);
-
-    // CAPA PARA DETECTAR CLIC EN CUADRAS (Invisible pero siempre presente)
-    const baseGeo = L.geoJSON(misRutas, { 
-        style: { opacity:0, color:'transparent', fillOpacity: 0 },
-        onEachFeature: (f, l) => {
-            l.on('click', e => {
-                L.DomEvent.stopPropagation(e);
-                limpiarCapas(true, true); // Borra rutas y cuadra anterior, pero NO Z7
-                mostrarFicha(f);
-            });
-        }
-    }).addTo(map);
-
-    // [El resto de las funciones: toggleL, toggleR, limpiarCombos, limpiarCapas, dibujar, mostrarFicha, etc. se mantienen idénticas]
-    
-    function toggleL() { 
-        const p = document.getElementById('panel-izq');
-        p.classList.toggle('collapsed');
-        document.querySelector('.btn-L').innerText = p.classList.contains('collapsed') ? "▶" : "◀";
-        setTimeout(() => map.invalidateSize(), 350);
-    }
-    function toggleR() { 
-        const p = document.getElementById('panel-der');
-        p.classList.toggle('active');
-        document.querySelector('.btn-R').innerText = p.classList.contains('active') ? "▶" : "◀";
-        setTimeout(() => map.invalidateSize(), 350);
-    }
-    function limpiarCombos() {
-        document.getElementById('cbSrv').selectedIndex = 0;
-        ['dTur','dFre','dRut'].forEach(id => document.getElementById(id).classList.add('hidden'));
-    }
-    function limpiarBusquedaRuta() { document.getElementById('inRuta').value = ""; }
-    function limpiarTodoBusqueda() { limpiarCombos(); limpiarBusquedaRuta(); }
-
-    function limpiarCapas(rutas = true, cuadra = true) {
-        if(rutas) { capR.clearLayers(); capE.clearLayers(); }
-        if(cuadra) { capC.clearLayers(); fCuadraActiva = null; }
-    }
-
-    function getColor(id) {
-        const colors = ['#2ecc71','#e74c3c','#9b59b6','#f1c40f','#3498db','#e67e22','#1abc9c'];
-        let hash = 0;
-        for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
-        return colors[Math.abs(hash) % colors.length];
-    }
-
-    function dibujar(ids) {
-        limpiarCapas(true, true);
-        const geo = L.geoJSON(misRutas, {
-            filter: f => {
-                const keys = Object.keys(f.properties);
-                for(let i = 20; i < keys.length; i++) {
-                    let val = String(f.properties[keys[i]]);
-                    if(ids.includes(val) && val !== "null") { f._match = val; return true; }
-                }
-                return false;
-            },
-            style: f => ({ color: ids.length === 1 ? "#e74c3c" : getColor(f._match), weight: 6, opacity: 0.8, interactive: false })
-        }).addTo(capR);
-        
-        let labels = new Set();
-        geo.eachLayer(l => {
-            if(!labels.has(l.feature._match)) {
-                L.marker(l.getBounds().getCenter(), { interactive: false, icon: L.divIcon({ className:'ruta-label', html: l.feature._match, iconSize:[null,null] }) }).addTo(capE);
-                labels.add(l.feature._match);
-            }
-        });
-        if(geo.getLayers().length) map.fitBounds(geo.getBounds(), {padding:[40,40]});
-    }
-
-    function mostrarFicha(f) {
-        fCuadraActiva = f;
-        capC.clearLayers();
-        L.geoJSON(f, { style: { color: "#e67e22", weight: 12, opacity:0.8, interactive: false } }).addTo(capC);
-        map.fitBounds(L.geoJSON(f).getBounds(), {padding:[100,100]});
-        
-        const p = f.properties;
-        let rIds = [];
-        Object.keys(p).slice(20).forEach(k => { if(p[k] && p[k]!=="null") rIds.push(p[k]); });
-
-        document.getElementById('sb-contenido').innerHTML = `
-            <div class="data-card"><span>Calle / Altura</span><p>${p.NOMOFICIAL} ${p.ALT_IZQINI}</p></div>
-            <div class="data-card"><span>Barrio</span><p>${p.BARRIO || '-'}</p></div>
-            <div class="data-card"><span>Comuna</span><p>C${p.COMUNA || '-'}</p></div>
-            <div class="data-card"><span>Desde</span><p>${p.DESDE || '-'}</p></div>
-            <div class="data-card"><span>Hasta</span><p>${p.HASTA || '-'}</p></div>
-            <div class="data-card"><span>Nombre Anterior</span><p>${p.NOMANTER || '-'}</p></div>
-            <div class="data-card"><span>Longitud</span><p>${p.LONG ? parseFloat(p.LONG).toFixed(2) : '0.00'} m</p></div>
-            <h4 style="margin:20px 0 5px; font-size:10px; color:var(--primary); border-bottom:1px solid #ddd;">RUTAS DISPONIBLES</h4>
-            <table class="tech-table">
-                <thead><tr><th>RUTA</th><th>SERVICIO</th><th>TURNO</th><th>FREC.</th></tr></thead>
-                <tbody>
-                ${rIds.map(id => {
-                    const m = db.find(d => d.RUTA == id);
-                    return `<tr onclick="verRuta('${id}')"><td><b>${id}</b></td><td>${m?m.NOM_SERVIC:'-'}</td><td>${m?m.TURNO:'-'}</td><td>${m?m.FRECUENCIA:'-'}</td></tr>`;
-                }).join('')}
-                </tbody>
-            </table>`;
-        document.getElementById('panel-der').classList.add('active');
-    }
-
-    function verRuta(id) {
-        const m = db.find(d => d.RUTA == id);
-        if(!m) return;
-        dibujar([id]);
-        document.getElementById('sb-contenido').innerHTML = `
-            ${fCuadraActiva ? '<button class="btn-back" onclick="mostrarFicha(fCuadraActiva)">← VOLVER A CUADRA</button>' : ''}
-            <h3 style="color:var(--danger); margin-top:0;">DETALLE RUTA ${id}</h3>
-            <div class="data-card"><span>Servicio</span><p>${m.NOM_SERVIC}</p></div>
-            <div class="data-card"><span>Cód. Servicio</span><p>${m.COD_SERVIC}</p></div>
-            <div class="data-card"><span>Turno</span><p>${m.TURNO}</p></div>
-            <div class="data-card"><span>Frecuencia</span><p>${m.FRECUENCIA}</p></div>
-            <div class="data-card"><span>Sector</span><p>${m.SECTOR}</p></div>
-            <div class="data-card"><span>Días</span><p>${m.DIA_PREST}</p></div>
-            <div class="data-card"><span>Hora Inicio</span><p>${m.HORA_INI}</p></div>
-            <div class="data-card" style="background:#fff3cd"><span>Actualización</span><p>${m.FECHA_ACT}</p></div>`;
-        document.getElementById('panel-der').classList.add('active');
-    }
-
-    function mostrarInformeMultiple(ids) {
-        document.getElementById('sb-contenido').innerHTML = `
-            <h3 style="color:var(--primary); margin-top:0;">RESUMEN DE SELECCIÓN</h3>
-            <p style="font-size:12px; color:#666;">Se visualizan ${ids.length} rutas en el mapa.</p>
-            <table class="tech-table">
-                <thead><tr><th>RUTA</th><th>SERVICIO</th><th>TURNO</th></tr></thead>
-                <tbody>
-                ${ids.map(id => {
-                    const m = db.find(d => d.RUTA == id);
-                    return `<tr onclick="verRuta('${id}')"><td><b>${id}</b></td><td>${m?m.NOM_SERVIC:'-'}</td><td>${m?m.TURNO:'-'}</td></tr>`;
-                }).join('')}
-                </tbody>
-            </table>`;
-        document.getElementById('panel-der').classList.add('active');
-    }
-
-    function initCombos() {
-        const isC = document.getElementById('checkCodigo').checked;
-        const s = document.getElementById('cbSrv');
-        const campo = isC ? 'COD_SERVIC' : 'NOM_SERVIC';
-        s.innerHTML = '<option value="">Seleccione Servicio...</option>';
-        [...new Set(db.map(d=>d[campo]))].filter(x=>x).sort().forEach(v=>s.innerHTML+=`<option value="${v}">${v}</option>`);
-        ['dTur','dFre','dRut'].forEach(id=>document.getElementById(id).classList.add('hidden'));
-    }
-
-    function manejarFiltros(e) {
-        const isC = document.getElementById('checkCodigo').checked;
-        const srv = document.getElementById('cbSrv').value;
-        const tur = document.getElementById('cbTur'), fre = document.getElementById('cbFre'), rut = document.getElementById('cbRut');
-        const campo = isC ? 'COD_SERVIC' : 'NOM_SERVIC';
-
-        if(e.target.id==='cbSrv') {
-            document.getElementById('dTur').classList.toggle('hidden', !srv);
-            tur.innerHTML = '<option value="">Seleccione Turno...</option>';
-            [...new Set(db.filter(d=>d[campo]===srv).map(x=>x.TURNO))].forEach(t=>tur.innerHTML+=`<option value="${t}">${t}</option>`);
-        }
-        else if(e.target.id==='cbTur') {
-            document.getElementById('dFre').classList.toggle('hidden', !tur.value);
-            fre.innerHTML = '<option value="">Seleccione Frecuencia...</option>';
-            [...new Set(db.filter(d=>d[campo]===srv && d.TURNO===tur.value).map(x=>x.FRECUENCIA))].forEach(f=>fre.innerHTML+=`<option value="${f}">${f}</option>`);
-        }
-        else if(e.target.id==='cbFre') {
-            document.getElementById('dRut').classList.remove('hidden');
-            const filtered = db.filter(d=>d[campo]===srv && d.TURNO===tur.value && d.FRECUENCIA===fre.value);
-            rut.innerHTML = '<option value="todas">--- MOSTRAR TODAS ---</option>';
-            filtered.forEach(r=>rut.innerHTML+=`<option value="${r.RUTA}">${r.RUTA}</option>`);
-            const ids = filtered.map(x=>x.RUTA);
-            dibujar(ids);
-            mostrarInformeMultiple(ids);
-        }
-        else if(e.target.id==='cbRut') {
-            if(rut.value==='todas') {
-                const ids = db.filter(d=>d[campo]===srv && d.TURNO===tur.value && d.FRECUENCIA===fre.value).map(x=>x.RUTA);
-                dibujar(ids);
-                mostrarInformeMultiple(ids);
-            } else {
-                verRuta(rut.value);
-            }
-        }
-    }
-
-    function sugerir(t) {
-        const list = document.getElementById('sugList');
-        if(t.length < 3) { list.classList.add('hidden'); return; }
-        const ops = [...new Set(misRutas.features.map(f=>f.properties.NOMOFICIAL).filter(n=>n && n.includes(t.toUpperCase())))].sort().slice(0,10);
-        list.innerHTML = ops.map(o=>`<div class="suggestion-item" onclick="selCalle('${o}')">${o}</div>`).join('');
-        list.classList.toggle('hidden', !ops.length);
-    }
-    function selCalle(n) { document.getElementById('inCalle').value=n; document.getElementById('sugList').classList.add('hidden'); document.getElementById('inAlt').focus(); }
-    function buscarCuadra() {
-        const c = document.getElementById('inCalle').value.toUpperCase(), a = parseInt(document.getElementById('inAlt').value);
-        const f = misRutas.features.find(feat => {
-            const p = feat.properties;
-            return p.NOMOFICIAL === c && a >= Math.min(p.ALT_IZQINI, p.ALT_IZQFIN) && a <= Math.max(p.ALT_IZQINI, p.ALT_IZQFIN);
-        });
-        if(f) { limpiarCapas(true, true); mostrarFicha(f); } else alert("Dirección no encontrada");
-    }
-    function navTeclado(e) {
-        const items = document.querySelectorAll('.suggestion-item');
-        if(!items.length) return;
-        if(e.key==="ArrowDown") { e.preventDefault(); sugIdx=(sugIdx+1)%items.length; highlight(items); }
-        else if(e.key==="ArrowUp") { e.preventDefault(); sugIdx=(sugIdx-1+items.length)%items.length; highlight(items); }
-        else if(e.key==="Enter") { e.preventDefault(); if(sugIdx>-1) selCalle(items[sugIdx].innerText); }
-    }
-    function highlight(items) { items.forEach((it,i)=>it.classList.toggle('active', i===sugIdx)); }
-    function busquedaGlobal() { 
-        const r = document.getElementById('inRuta').value.trim(); 
-        if(r) { limpiarCapas(true, true); verRuta(r); } 
-    }
-    function limpiarTodo() { 
-        limpiarCapas(true, true); 
-        document.getElementById('panel-der').classList.remove('active'); 
-        map.setView([-34.63, -58.36], 13);
-        document.querySelectorAll('input, select').forEach(el => el.value = "");
-        ['dTur','dFre','dRut'].forEach(id=>document.getElementById(id).classList.add('hidden'));
-    }
-    initCombos();
-</script>
 </body>
 </html>
