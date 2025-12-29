@@ -44,6 +44,30 @@ body, html {
 .btn-R { right: 0; border-radius: 8px 0 0 8px; transition: right 0.3s ease; }
 .sidebar-right.active + .btn-R { right: 420px; }
 
+/* Contenedor del label para alinear checkbox y texto */
+.check-container {
+    display: flex;
+    align-items: center; /* Alineación vertical perfecta */
+    font-size: 12px;    /* Texto un poco más chico */
+    color: #444;
+    cursor: pointer;
+    line-height: 1;
+    padding: 2px 0;
+}
+
+/* Achicar el checkbox */
+.layer-check {
+    width: 13px;        /* Ancho reducido */
+    height: 13px;       /* Alto reducido */
+    margin: 0 8px 0 0;  /* Espacio a la derecha del check */
+    cursor: pointer;
+    appearance: auto;   /* Mantiene el estilo nativo pero escalado */
+    transform: scale(0.9); /* Ajuste fino de escala si es necesario */
+}
+
+.check-container:hover {
+    color: #000;
+}
 
 /* Elementos de Interfaz */
 .panel-header { 
