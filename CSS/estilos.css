@@ -6,6 +6,46 @@
     --text: #2c3e50; 
 }
 
+@page { size: A4 portrait; margin: 0; }
+body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #eee; }
+
+.a4-page { 
+    width: 210mm; 
+    height: 297mm; 
+    background: white; 
+    margin: 10px auto; 
+    padding: 10mm; 
+    box-sizing: border-box; 
+    display: flex; 
+    flex-direction: column; /* Esto permite el orden Vertical */
+}
+
+.report-title { 
+    font-size: 24px; 
+    text-align: center; 
+    border-bottom: 2px solid #000; 
+    margin: 0 0 15px 0; 
+    padding-bottom: 10px;
+    text-transform: uppercase;
+    font-weight: 800; /* Más negrita */
+    color: #1a1a1a;   /* Un negro más profundo */
+}
+
+.ruta-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+.ruta-table td { border: 1px solid #eee; padding: 6px; }
+
+/* El mapa se expande para llenar la hoja */
+#map-static { flex-grow: 1; width: 100%; }
+
+.footer-stamp { font-size: 8px; color: #999; text-align: right; margin-top: 5px; }
+
+@media print { 
+    .toolbar { display: none; } 
+    body { background: white; } 
+    .a4-page { margin: 0; border: none; height: 100vh; } 
+}
+
+
 body, html { 
     margin: 0; padding: 0; height: 100vh; overflow: hidden; 
     font-family: 'Segoe UI', sans-serif; background: var(--bg); 
@@ -114,3 +154,35 @@ select, input {
 
 .ruta-label { background: white; border: 2px solid #333; padding: 2px 5px; font-weight: bold; font-size: 10px; }
 .hidden { display: none; }
+
+.a4-page { 
+    width: 210mm; 
+    height: 285mm; 
+    background: white; 
+    margin: 10px auto; 
+    box-sizing: border-box; 
+    display: flex; 
+    flex-direction: column; 
+}
+.servicios-grid { 
+    display: grid; 
+    grid-template-columns: 1fr 1fr; 
+    gap: 15px; 
+    margin-bottom: 10px;
+}
+.cuadra-layout {
+    display: flex;
+    flex-direction: column;
+    height: 275mm; /* Asegura que la página tenga altura */
+}
+
+#map-static {
+    flex: 1; /* Esto hace que el mapa ocupe todo el espacio sobrante de la tabla */
+    min-height: 400px;
+    width: 100%;
+}
+
+.ruta-label-informe {
+    background: transparent;
+    border: none;
+}
