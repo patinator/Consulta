@@ -2,11 +2,11 @@ let db = [], fCuadraActiva = null, sugIdx = -1;
 let capR = L.layerGroup(), capE = L.layerGroup(), capC = L.layerGroup();
 
 const mapasBase = {
-    'osm': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap'
-    }),
     'carto_light': L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; CARTO'
+    }),
+    'osm': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap'
     }),
     // REEMPLAZO DE GCBA: Mapa Oficial del Instituto Geográfico Nacional (IGN)
     'ign': L.tileLayer('https://wms.ign.gob.ar/geoserver/gwc/service/tms/1.0.0/capabaseargenmap@EPSG%3A3857@png/{z}/{x}/{-y}.png', {
@@ -15,10 +15,10 @@ const mapasBase = {
         maxZoom: 18
     }),
     // GOOGLE STREETS (Solo dibujo/callejero)
-    'google_streets': L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-        maxZoom: 20,
-        subdomains: ['mt0','mt1','mt2','mt3'],
-        attribution: '&copy; Google Maps'
+   'google_streets': L.tileLayer('https://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}', {
+    maxZoom: 20,
+    subdomains: ['mt0','mt1','mt2','mt3'],
+    attribution: '&copy; Google Maps'
     })
 };
 
@@ -138,7 +138,7 @@ try {
 // 2. Inicializar Mapa
 const map = L.map('map').setView([-34.63, -58.36], 13);
 // Variable para rastrear la capa actual
-let capaBaseActual = mapasBase['osm'];
+let capaBaseActual = mapasBase['carto_light'];
 
 // 2. Inicializar el mapa con la capa por defecto
 capaBaseActual.addTo(map);
@@ -242,10 +242,17 @@ function limpiarCapas(rutas = true, cuadra = true) {
 }
 
 function getColor(id) {
+    if (!id) return '#3388ff';
     let hash = 0;
-    for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
-    return coloresPuntos[Math.abs(hash) % coloresPuntos.length];
+    for (let i = 0; i < id.length; i++) {
+        hash = id.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    // Usamos el número áureo para dispersar los colores (360 * 0.618033...)
+    // Esto hace que IDs correlativos (4113, 4114) tengan colores muy distintos
+    const hue = Math.abs(hash * 137.5) % 360; 
+    return `hsl(${hue}, 80%, 45%)`;
 }
+
 
 function dibujar(ids) {
     limpiarCapas(true, true);
@@ -258,7 +265,14 @@ function dibujar(ids) {
             }
             return false;
         },
-        style: f => ({ color: ids.length === 1 ? "#e74c3c" : getColor(f._match), weight: 6, opacity: 0.8, interactive: false })
+        style: f => ({ 
+            // IMPORTANTE: f.feature._match o f._match según la versión. 
+            // Probemos con f._match que es donde lo guardaste en el filter.
+            color: ids.length === 1 ? "#e74c3c" : getColor(f._match || ""), 
+            weight: 6, 
+            opacity: 0.8, 
+            interactive: false 
+        })
     }).addTo(capR);
     
     let labels = new Set();
@@ -268,7 +282,7 @@ function dibujar(ids) {
             labels.add(l.feature._match);
         }
     });
-    if(geo.getLayers().length) map.fitBounds(geo.getBounds(), {padding:[40,40]});
+    if(geo.getLayers().length) map.fitBounds(geo.getBounds(), {padding:[40,40]});  //vista del mapa, no del reporte
 }
 
 function mostrarFicha(f) {
@@ -276,7 +290,11 @@ function mostrarFicha(f) {
 
     capC.clearLayers();
     L.geoJSON(f, { style: { color: "#e67e22", weight: 12, opacity:0.8, interactive: false } }).addTo(capC);
-    map.fitBounds(L.geoJSON(f).getBounds(), {padding:[100,100]});
+    map.fitBounds(L.geoJSON(f).getBounds(), {padding:[300,300]});
+    //map.setZoom(map.getBoundsZoom(l.getBounds()) - 1);
+    // OPCIÓN B (Si la A no es suficiente): Forzar un nivel menos de zoom después del ajuste
+    //map.setZoom(50); // Baja un nivel de zoom extra para ver más contexto
+
     
     const p = f.properties;
     let rIds = [];
@@ -321,7 +339,8 @@ function verRuta(id) {
         <div class="data-card"><span>Hora Inicio</span><p>${m.HORA_INI}</p></div>
         <div class="data-card"><span>Actualización</span><p>${m.FECHA_ACT}</p></div>`;
     document.getElementById('panel-der').classList.add('active');
-    
+    const btnInforme = document.getElementById('btn-imprimir');
+    if(btnInforme) btnInforme.style.display = 'block'; // Mostrar siempre en cuadra única
 }
 
 function mostrarInformeMultiple(ids) {
@@ -354,6 +373,9 @@ function manejarFiltros(e) {
     const srv = document.getElementById('cbSrv').value;
     const tur = document.getElementById('cbTur'), fre = document.getElementById('cbFre'), rut = document.getElementById('cbRut');
     const campo = isC ? 'COD_SERVIC' : 'NOM_SERVIC';
+    
+    // Referencia al botón (asegúrate de que este ID sea el correcto en tu HTML)
+    const btnInforme = document.getElementById('btn-imprimir'); 
 
     if(e.target.id==='cbSrv') {
         document.getElementById('dTur').classList.toggle('hidden', !srv);
@@ -371,20 +393,30 @@ function manejarFiltros(e) {
         rut.innerHTML = '<option value="todas">--- MOSTRAR TODAS ---</option>';
         filtered.forEach(r=>rut.innerHTML+=`<option value="${r.RUTA}">${r.RUTA}</option>`);
         const ids = filtered.map(x=>x.RUTA);
+        
+        // AL FILTRAR POR FRECUENCIA SE MUESTRAN TODAS -> OCULTAMOS BOTÓN
+        if(btnInforme) btnInforme.style.display = 'none'; 
+        
         dibujar(ids);
         mostrarInformeMultiple(ids);
     }
     else if(e.target.id==='cbRut') {
         if(rut.value==='todas') {
             const ids = db.filter(d=>d[campo]===srv && d.TURNO===tur.value && d.FRECUENCIA===fre.value).map(x=>x.RUTA);
+            
+            // SI ELIGE "TODAS" -> OCULTAMOS BOTÓN
+            if(btnInforme) btnInforme.style.display = 'none'; 
+            
             dibujar(ids);
             mostrarInformeMultiple(ids);
         } else {
+            // SI ELIGE UNA RUTA ESPECÍFICA -> MOSTRAR BOTÓN
+            if(btnInforme) btnInforme.style.display = 'block'; 
+            
             verRuta(rut.value);
         }
     }
 }
-
 function sugerir(t) {
     const list = document.getElementById('sugList');
     if(t.length < 3) { list.classList.add('hidden'); return; }
@@ -514,82 +546,63 @@ function crearMarcador(latlng, color) {
 }
 
 function generarInforme() {
-    // 1. CAPTURA DE PUNTOS Y COLORES ACTIVOS
-    let puntosParaInforme = [];
-    let tiposActivosParaLeyenda = [];
-    const mappingNombres = { 
-        'verdes': 'VERDE', 
-        'laterales': 'LATERAL', 
-        'bilaterales': 'BILATERAL', 
-        'soterrados': 'SOTERRADO' 
-        //'cestos': 'CESTO' 
-    };
-
-    Object.keys(capasContenedores).forEach(key => {
-        if (capasContenedores[key] && map.hasLayer(capasContenedores[key])) {
-            puntosParaInforme.push(capasContenedores[key].toGeoJSON());
-            tiposActivosParaLeyenda.push(mappingNombres[key]);
-        }
-    });
-
-    // 2. CAPTURA DE CONTENIDO TÉCNICO
+    // 1. CAPTURA DE CONTENIDO Y VALIDACIÓN
     const contenido = document.getElementById('sb-contenido');
     if (!contenido || !contenido.innerHTML.trim()) return alert("Seleccione algo para reportar.");
 
-    const esRuta = contenido.innerHTML.includes("DETALLE RUTA");
-    
+    const esMultiruta = contenido.innerHTML.includes("TODAS LAS RUTAS") || contenido.innerHTML.includes("RESULTADOS DE BÚSQUEDA");
+    if (esMultiruta) {
+        return alert("Por favor, seleccione una ruta o cuadra específica para generar el informe técnico.");
+    }
+
+    // 2. CAPTURA DE DATOS TÉCNICOS
     const datosArray = Array.from(contenido.querySelectorAll('.data-card')).map(card => ({
-        label: card.querySelector('span').innerText.toLowerCase().trim(),
+        label: card.querySelector('span').innerText.trim(), // Sin toLowerCase aquí para comparar mejor
         valor: card.querySelector('p').innerText.trim()
     }));
+
+    const esRuta = contenido.innerHTML.includes("DETALLE RUTA");
+
+    // 3. LÓGICA DE TÍTULOS (Corregida)
+    let tituloInforme = "";
+    if (esRuta) {
+        // Buscamos ignorando mayúsculas/minúsculas
+        const obtenerValor = (txt) => datosArray.find(d => d.label.toLowerCase().includes(txt.toLowerCase()))?.valor || "";
+        const numRuta = obtenerValor("ruta");
+        
+        // Si numRuta sigue vacío, intentamos sacarlo del h3 del sidebar como plan B
+        const backupRuta = numRuta || contenido.querySelector('h3')?.innerText.replace(/[^0-9]/g, '') || "";
+        
+        tituloInforme = `DETALLE DE RUTA ${backupRuta}`;
+    } else {
+        const obtenerValor = (txt) => datosArray.find(d => d.label.toLowerCase().includes(txt.toLowerCase()))?.valor || "";
+        const calle = obtenerValor("calle");
+        const barrio = obtenerValor("barrio");
+        const comunaVal = obtenerValor("comuna");
+        tituloInforme = `${calle} - ${barrio} - COMUNA ${comunaVal}`;
+    }
+
+    // 4. CAPTURA DE CAPAS (Líneas y Puntos)
+    let puntosParaInforme = [];
+    const mappingNombres = { 'verdes': 'VERDE', 'laterales': 'LATERAL', 'bilaterales': 'BILATERAL', 'soterrados': 'SOTERRADO' };
+
+    Object.keys(mappingNombres).forEach(key => {
+        if (capasContenedores[key] && map.hasLayer(capasContenedores[key])) {
+            puntosParaInforme.push(capasContenedores[key].toGeoJSON());
+        }
+    });
 
     const capasActivas = [];
     capR.eachLayer(l => capasActivas.push(l.toGeoJSON()));
     capC.eachLayer(l => capasActivas.push(l.toGeoJSON()));
 
-    // 3. GENERAR HTML DE LA LEYENDA (Usando coloresPuntos global)
-    let leyendaHTML = "";
-    if (tiposActivosParaLeyenda.length > 0) {
-        leyendaHTML = `
-            <div style="position: absolute; bottom: 15px; left: 15px; z-index: 1000; background: white; padding: 6px; border: 1.5px solid #000; font-size: 9px; font-family: Arial, sans-serif; min-width: 100px;">
-                <b style="border-bottom: 1px solid #ccc; display: block; margin-bottom: 4px; font-size: 8px; letter-spacing: 0.5px;">REFERENCIAS</b>
-                ${tiposActivosParaLeyenda.map(tipo => `
-                    <div style="display: flex; align-items: center; margin-bottom: 3px;">
-                        <div style="width: 10px; height: 10px; background: ${coloresPuntos[tipo]}; border: 1px solid #fff; border-radius: 50%; margin-right: 7px; box-shadow: 0 0 1px #000;"></div>
-                        <span style="font-weight: bold; color: #333;">${tipo}</span>
-                    </div>
-                `).join('')}
-            </div>`;
-    }
-
-    const ventana = window.open('', 'Reporte', 'width=900,height=1100');
-    let htmlContent = "";
-
-    // 4. CONSTRUCCIÓN DEL LAYOUT (RUTA O CUADRA)
+    // 5. CONSTRUCCIÓN DEL HTML
+    let tablaSuperior = "";
     if (esRuta) {
-        htmlContent = `
-            <div class="a4-page ruta-layout">
-                <div style="position: relative; width: 100%; flex-shrink: 0;">
-                    <div id="map-static" class="map-ruta"></div>
-                    ${leyendaHTML}
-                </div>
-                <div class="info-container">
-                    <h2 class="report-title">DETALLE TÉCNICO DE RUTA</h2>
-                    <table class="ruta-table">
-                        ${generarFilasTabla(datosArray, 2, 100)}
-                    </table>
-                </div>
-                <div class="footer-stamp">Generado el: ${new Date().toLocaleString()}</div>
-            </div>`;
+        tablaSuperior = `<table class="ruta-table">${generarFilasTabla(datosArray, 2, 100)}</table>`;
     } else {
-        const calle = datosArray.find(d => d.label.includes("calle"))?.valor || "";
-        const barrio = datosArray.find(d => d.label.includes("barrio"))?.valor || "";
-        const comunaVal = datosArray.find(d => d.label.includes("comuna"))?.valor || "";
-        const tituloCompleto = `${calle} - ${barrio} - COMUNA ${comunaVal}`;
-
         const rutasBrutas = [];
-        const filas = contenido.querySelectorAll('.tech-table tbody tr');
-        filas.forEach(tr => {
+        contenido.querySelectorAll('.tech-table tbody tr').forEach(tr => {
             const cols = tr.querySelectorAll('td');
             if(cols.length >= 4) {
                 const tAbrev = cols[2].innerText.trim().toUpperCase();
@@ -597,127 +610,91 @@ function generarInforme() {
                 rutasBrutas.push({ ruta: cols[0].innerText.trim(), servicio: cols[1].innerText.trim(), turno: tComp, frec: cols[3].innerText.trim() });
             }
         });
-
-        const ordenTurnos = ["MAÑANA", "TARDE", "NOCHE"];
-        const listadoHTML = ordenTurnos.map(t => {
+        const listadoHTML = ["MAÑANA", "TARDE", "NOCHE"].map(t => {
             const filtradas = rutasBrutas.filter(r => r.turno === t);
-            if (filtradas.length === 0) return "";
-            return `
-                <div class="turno-block">
-                    <div class="turno-header">TURNO: ${t}</div>
-                    <table class="cuadra-table">
-                        <tbody>
-                            ${filtradas.map(r => `<tr><td style="width:35px"><b>${r.ruta}</b></td><td>${r.servicio}</td><td align="right">${r.frec}</td></tr>`).join('')}
-                        </tbody>
-                    </table>
-                </div>`;
+            if (!filtradas.length) return "";
+            return `<div class="turno-block"><div class="turno-header">TURNO: ${t}</div><table class="cuadra-table">${filtradas.map(r => `<tr><td style="width:40px"><b>${r.ruta}</b></td><td>${r.servicio}</td><td align="right">${r.frec}</td></tr>`).join('')}</table></div>`;
         }).join('');
-
-        htmlContent = `
-            <div class="a4-page" style="padding: 8mm;">
-                <h1 class="cuadra-title">${tituloCompleto}</h1>
-                <div style="position: relative;">
-                    <div id="map-static" class="map-cuadra"></div>
-                    ${leyendaHTML}
-                </div>
-                <div class="servicios-grid">${listadoHTML}</div>
-                <div class="footer-stamp">Generado el: ${new Date().toLocaleString()}</div>
-            </div>`;
+        tablaSuperior = `<div class="servicios-grid">${listadoHTML}</div>`;
     }
 
-    // 5. ESCRITURA DEL DOCUMENTO FINAL
+    const ventana = window.open('', 'Reporte', 'width=900,height=1100');
     ventana.document.write(`
         <html>
         <head>
-            <title>Reporte de Gestión</title>
+            <title>Reporte Técnico</title>
             <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
             <style>
                 @page { size: A4 portrait; margin: 0; }
-                body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #333; }
-                .toolbar { width: 100%; background: #000; padding: 10px; text-align: center; position: sticky; top: 0; z-index: 9999; }
-                .btn-print { padding: 10px 30px; background: #27ae60; color: white; border: none; cursor: pointer; font-weight: bold; border-radius: 4px; }
-                .a4-page { width: 210mm; height: 285mm; background: white; margin: 10px auto; box-sizing: border-box; position: relative; overflow: hidden; }
-                .ruta-layout { display: flex; flex-direction: column; padding: 10mm; }
-                .map-ruta { width: 100%; height: 215mm; border: 1px solid #000; }
-                .report-title { font-size: 16px; text-align: center; border-bottom: 2px solid #000; padding-bottom: 5px; margin: 5px 0 10px 0; }
-                .ruta-table { width: 100%; border-collapse: collapse; }
-                .ruta-table td { border: 1px solid #ddd; padding: 6px; vertical-align: top; }
-                .cuadra-title { font-size: 18px; text-align: center; border-bottom: 2px solid #000; padding-bottom: 5px; margin: 0 0 10px 0; }
-                .map-cuadra { width: 100%; height: 100mm; border: 1px solid #000; margin-bottom: 15px; }
-                .servicios-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-                .turno-header { background: #333; color: white; font-size: 10px; padding: 3px 8px; font-weight: bold; }
-                .cuadra-table { width: 100%; border-collapse: collapse; font-size: 9px; border: 1px solid #ccc; }
-                .cuadra-table td { padding: 3px; border-bottom: 1px solid #eee; }
-                .label { display: block; font-size: 8px; font-weight: bold; color: #666; text-transform: uppercase; }
+                body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #eee; }
+                .toolbar { background: #000; padding: 10px; text-align: center; position: sticky; top: 0; z-index: 999; }
+                .a4-page { width: 210mm; height: 297mm; background: white; margin: 10px auto; padding: 10mm; box-sizing: border-box; display: flex; flex-direction: column; }
+                                .report-title {
+                    font-size: 22px; 
+                    text-align: center; 
+                    border-bottom: 3px solid #000; /* Línea un poco más gruesa */
+                    margin: 0 0 20px 0; 
+                    padding-bottom: 8px; 
+                    text-transform: uppercase;
+                    font-weight: bold;
+                }
+                .servicios-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+                .turno-header { background: #333; color: white; font-size: 10px; padding: 4px 8px; font-weight: bold; }
+                .cuadra-table, .ruta-table { width: 100%; border-collapse: collapse; font-size: 10px; border: 1px solid #ccc; }
+                .cuadra-table td, .ruta-table td { padding: 4px; border-bottom: 1px solid #eee; }
+                .label { display: block; font-size: 8px; color: #666; font-weight: bold; text-transform: uppercase; }
                 .value { font-size: 11px; font-weight: bold; }
-                .footer-stamp { position: absolute; bottom: 5mm; right: 10mm; font-size: 8px; color: #999; }
-                @media print { .toolbar { display: none; } body { background: white; } .a4-page { margin: 0; border: none; box-shadow: none; height: 100vh; } }
+                #map-static { flex-grow: 1; width: 100%; border: 1px solid #000; }
+                .footer-stamp { font-size: 8px; color: #999; text-align: right; margin-top: 5px; }
+                @media print { .toolbar { display: none; } body { background: white; } .a4-page { margin: 0; border: none; } }
             </style>
         </head>
         <body>
-            <div class="toolbar"><button class="btn-print" onclick="window.print()">IMPRIMIR PDF</button></div>
-            ${htmlContent}
+            <div class="toolbar"><button onclick="window.print()">IMPRIMIR PDF</button></div>
+            <div class="a4-page">
+                <h1 class="report-title">${tituloInforme}</h1>
+                <div style="margin-bottom:15px;">${tablaSuperior}</div>
+                <div id="map-static"></div>
+                <div class="footer-stamp">Generado el: ${new Date().toLocaleString()}</div>
+            </div>
             <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
             <script>
-                // Dentro de generarInforme, en ventana.document.write:
+                const map = L.map('map-static', { zoomControl: false, attributionControl: false });
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
 
-                // Dentro de generarInforme (ventana.document.write)
-                const map = L.map('map-static', { zoomControl: false, dragging: false, scrollWheelZoom: false, attributionControl: false });
+                const lineas = ${JSON.stringify(capasActivas)};
+                const puntos = ${JSON.stringify(puntosParaInforme)};
+                const colsPuntos = ${JSON.stringify(coloresPuntos)};
 
-                const urlActual = '${capaBaseActual._url}';
-                const isGoogle = urlActual.includes('google');
-                const isIGN = urlActual.includes('ign.gob.ar');
-
-                L.tileLayer(urlActual, {
-                    subdomains: isGoogle ? ['mt0','mt1','mt2','mt3'] : ['a','b','c'],
-                    tms: isIGN, // El IGN también usa inversión de eje Y
-                    maxZoom: 18
-                }).addTo(map);
-
-                // LÍNEAS (Rojo) - Prioridad de Zoom
-                const geoData = ${JSON.stringify(capasActivas)};
-                if(geoData.length > 0) {
-                    const l = L.geoJSON(geoData, { style: { color: "#e74c3c", weight: 10, opacity: 1 } }).addTo(map);
-                    map.fitBounds(l.getBounds(), { padding: [${esRuta ? 40 : 150}, ${esRuta ? 40 : 150}] });
+                let layerLineas;
+                if(lineas.length > 0) {
+                    layerLineas = L.geoJSON(lineas, { 
+                        style: { color: "#e74c3c", weight: 8, opacity: 0.5 } 
+                    }).addTo(map);
                 }
 
-                // PUNTOS (Contenedores) - Colores Globales y Popups
-                const puntosData = ${JSON.stringify(puntosParaInforme)};
-                const cols = ${JSON.stringify(coloresPuntos)};
-
-                puntosData.forEach(geojson => {
-                    L.geoJSON(geojson, {
+                puntos.forEach(gj => {
+                    L.geoJSON(gj, {
                         pointToLayer: (f, latlng) => {
-                            const p = f.properties;
-                            
-                            // Normalización de tipo (Si COD_EQUIPA no existe o es nulo, es VERDE)
-                            let cod = (p.COD_EQUIPA || "").toString().trim().toUpperCase();
-                            if (!cod) cod = 'VERDE';
-
-                            const popupHTML = \`
-                                <div style="font-size:10px; min-width:140px; font-family:Arial;">
-                                    <b style="color:#d35400; display:block; border-bottom:1px solid #eee; margin-bottom:3px;">DATOS EQUIPO</b>
-                                    <b>ID:</b> \${p.ID_EQUIPO || 'S/D'}<br>
-                                    <b>Calle:</b> \${p.CALLE || 'S/D'}<br>
-                                    <b>Altura:</b> \${p.ALTURA || 'S/D'}<br>
-                                    <b>Tipo:</b> \${cod}<br>
-                                    <b>Ubicación:</b> \${p.UBICACIÓN || 'S/D'}
-                                </div>\`;
-
-                            return L.circleMarker(latlng, {
-                                radius: 5,
-                                fillColor: cols[cod] || cols['VERDE'],
-                                color: "#fff",
-                                weight: 1,
-                                fillOpacity: 0.9
-                            }).bindPopup(popupHTML);
+                            let cod = (f.properties.COD_EQUIPA || "VERDE").toString().trim().toUpperCase();
+                            return L.circleMarker(latlng, { radius: 5, fillColor: colsPuntos[cod] || "#000", color: "#fff", weight: 1, fillOpacity: 0.9 });
                         }
                     }).addTo(map);
                 });
+
+                if (layerLineas) {
+                    setTimeout(() => {
+                        map.invalidateSize();
+                        const pad = ${esRuta ? 80 : 350};
+                        map.fitBounds(layerLineas.getBounds(), { padding: [pad, pad] });
+                        if (!${esRuta}) { map.setZoom(map.getZoom() - 1); }
+                    }, 350);
+                }
             </script>
         </body>
         </html>
     `);
+    ventana.document.close();
 
     function generarFilasTabla(datos, cols, max) {
         let html = '';
@@ -725,13 +702,13 @@ function generarInforme() {
             html += '<tr>';
             for (let j = 0; j < cols; j++) {
                 const item = datos[i + j];
+                // Usamos item.label original para mostrar en la tabla
                 html += `<td style="width:${100/cols}%">${item ? `<span class="label">${item.label}</span><span class="value">${item.valor}</span>` : ''}</td>`;
             }
             html += '</tr>';
         }
         return html;
     }
-    ventana.document.close();
 }
 // Iniciar Combos al cargar
 initCombos();
