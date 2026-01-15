@@ -649,6 +649,15 @@ function generarInforme() {
                 @media print { .toolbar { display: none; } body { background: white; } .a4-page { margin: 0; border: none; } }
             </style>
         </head>
+        <!-- Google tag (gtag.js) -->
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-CJKP4E2R97"></script>
+        <script>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+        
+          gtag('config', 'G-CJKP4E2R97');
+        </script>
         <body>
             <div class="toolbar"><button onclick="window.print()">IMPRIMIR PDF</button></div>
             <div class="a4-page">
@@ -711,4 +720,5 @@ function generarInforme() {
     }
 }
 // Iniciar Combos al cargar
+
 initCombos();
