@@ -1,5 +1,5 @@
 // --- DATOS OPERATIVOS ---
-const datosOperativos = [
+const datosCrudos = [
   {
     "RUTA": "1001",
     "COD_SERVIC": "RDCLD",
