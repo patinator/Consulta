@@ -2,6 +2,9 @@ let db = [], fCuadraActiva = null, sugIdx = -1;
 let capR = L.layerGroup(), capE = L.layerGroup(), capC = L.layerGroup();
 
 const mapasBase = {
+    'URBASUR': L.tileLayer('Browser/teselas/{z}/{x}/{y}.png', {
+        attribution: '&copy; URBA'
+    }),
     'carto_light': L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; CARTO'
     }),
@@ -138,7 +141,7 @@ try {
 // 2. Inicializar Mapa
 const map = L.map('map').setView([-34.63, -58.36], 13);
 // Variable para rastrear la capa actual
-let capaBaseActual = mapasBase['carto_light'];
+let capaBaseActual = mapasBase['URBASUR'];
 
 // 2. Inicializar el mapa con la capa por defecto
 capaBaseActual.addTo(map);
@@ -171,14 +174,14 @@ document.getElementById('selector-mapa').addEventListener('change', function(e) 
 //     attribution: '&copy; Stadia Maps &copy; OpenStreetMap'
 // }).addTo(map);
 
-
+/* 
 // 3. Capa Z7 (Permanente)
 if (typeof Z7 !== 'undefined') {
     L.geoJSON(Z7, {
         style: { color: "#2c3e50", weight: 2, opacity: 0.6, fillColor: "#34495e", fillOpacity: 0.1, interactive: false }
     }).addTo(map);
 }
-
+ */
 // 4. Activar Capas Operativas
 capR.addTo(map); capE.addTo(map); capC.addTo(map);
 
@@ -187,7 +190,7 @@ const baseGeo = L.geoJSON(misRutas, {
     style: { 
         stroke: true,        // Activamos el borde
         color: 'transparent', // Pero lo hacemos invisible
-        weight: 10,           // Le damos grosor para que sea fácil clickear
+        weight: 20,           // Le damos grosor para que sea fácil clickear
         fillColor: '#000',    // Color de relleno (no se verá)
         fillOpacity: 0,       // Totalmente transparente
         interactive: true     // Obligatorio para capturar el clic
@@ -669,7 +672,15 @@ function generarInforme() {
             <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
             <script>
                 const map = L.map('map-static', { zoomControl: false, attributionControl: false });
-                L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+
+                // L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+
+                L.tileLayer('Browser/teselas/{z}/{x}/{y}.png', {
+                    minZoom: 5,
+                    maxZoom: 18,
+                    tms: false,
+                    attribution: 'Mis datos, QGIS'
+                }).addTo(map);
 
                 const lineas = ${JSON.stringify(capasActivas)};
                 const puntos = ${JSON.stringify(puntosParaInforme)};
