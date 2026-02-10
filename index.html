@@ -7,15 +7,6 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="CSS/estilos.css" />
 </head>
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-CJKP4E2R97"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-CJKP4E2R97');
-</script>
 <body>
 
 <div class="app-grid">
@@ -84,6 +75,7 @@
         <div class="control-group">
             <label for="selector-mapa" style="font-weight:bold; font-size:12px;">Mapa Base:</label>
             <select id="selector-mapa" style="width:100%; padding:5px; margin-top:5px; font-size:12px;">
+                <option value="URBASUR">Urbasur</option>
                 <option value="carto_light">CartoDB Light</option>
                 <option value="osm">OpenStreetMap</option>
                 <option value="ign">Mapa Oficial IGN</option>
@@ -120,5 +112,4 @@
 <script src="JS/mapa.js"></script>
 
 </body>
-
 </html>
