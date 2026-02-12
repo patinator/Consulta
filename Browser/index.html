@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geocodificador de Reclamos</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        body { margin: 0; padding: 0; display: flex; height: 100vh; overflow: hidden; font-family: sans-serif; }
+        
+        #panel-lateral { 
+            width: 280px; /* Un poco más angosto el panel */
+            background: #f4f4f4; 
+            border-right: 1px solid #ccc; 
+            z-index: 1000;
+            padding: 10px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: 8px; /* Menor espacio entre grupos */
+            overflow-y: auto;
+        }
+
+        #mapa { flex-grow: 1; background-color: #fff; }
+        
+        h3 { margin: 0 0 5px 0; color: #333; font-size: 18px; }
+
+        .filtro-grupo { margin-bottom: 10px; } /* Menor margen entre grupos */
+        .filtro-titulo { font-weight: bold; margin-bottom: 5px; color: #555; display: block; border-bottom: 1px solid #ccc; padding-bottom: 3px; font-size: 14px; }
+        
+        /* Contenedor de botones (una sola columna) */
+        .contenedor-botones-col {
+            display: flex;
+            flex-direction: column;
+            gap: 4px; /* Menor espacio entre botones */
+        }
+
+        /* Estilo para los botones de servicio - MÁS ANGOSTOS Y BAJOS */
+        .btn-servicio { 
+            width: 100%;
+            padding: 5px 2px; /* Menos padding interno */
+            background-color: #007bff; 
+            color: white; 
+            border: none; 
+            cursor: pointer; 
+            font-size: 12px; /* Fuente más pequeña */
+            border-radius: 4px;
+            transition: background-color 0.2s;
+            
+            /* Altura más baja para que quepan todos */
+            height: 40px; 
+            
+            /* Centrado de texto */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            line-height: 1.1;
+            
+            /* Manejo de texto multilínea */
+            word-wrap: break-word;
+            white-space: normal;
+            overflow: hidden;
+        }
+        .btn-servicio:hover { background-color: #0056b3; }
+        .btn-servicio:active { background-color: #004494; }
+
+    </style>
+</head>
+<body>
+
+    <div id="panel-lateral">
+        <h3>Procesar Reclamos</h3>
+        <p style="font-size: 12px; color: #666;">Seleccione un servicio para geocodificar en el mapa:</p>
+        
+        <div id="contenedor-botones"></div>
+    </div>
+
+    <div id="mapa"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script src="CALLES.js"></script>
+    <script src="RECLAMOS.js"></script>
+    <script src="RUTAS.js"></script>
+    
+    <script>
+        let map;
+        let markersLayer = L.layerGroup();
+
+        // --- DATOS DE FILTROS ---
+        const filtrosData = {
+            "Turno Mañana": [
+                { "Nombre": "Recolección Domiciliaria", "SERVICIO": "RDOM", "TURNO": "T3", "CLAVE": "RDOMTM" },
+                { "Nombre": "Barrido Manual", "SERVICIO": "BMAN", "TURNO": "T1", "CLAVE": "BMANTM" },
+                { "Nombre": "Almejas", "SERVICIO": "ALME", "TURNO": "T1", "CLAVE": "ALMETM" },
+                { "Nombre": "Mantenimiento de Contenedores", "SERVICIO": "MACO", "TURNO": "T1", "CLAVE": "MACOTM" },
+                { "Nombre": "Lavado de Contenedores", "SERVICIO": "LACO", "TURNO": "T1", "CLAVE": "LACOTM" },
+                { "Nombre": "1000 horas", "SERVICIO": "1000", "TURNO": "T1", "CLAVE": "_1000TM" },
+                { "Nombre": "Reposición de Cestos Papeleros", "SERVICIO": "RECE", "TURNO": "T1", "CLAVE": "RECETM" },
+            ],
+            "Turno Noche": [
+                { "Nombre": "Recolección Domiciliaria - Rutas", "SERVICIO": "RDOM", "TURNO": "T3", "CLAVE": "RDOMTN" },
+                { "Nombre": "Recolección Domiciliaria - Supervisores", "SERVICIO": "RDOM", "TURNO": "T3", "CLAVE": "SDOMTN" },
+                { "Nombre": "Mantenimiento de Contenedores", "SERVICIO": "MACO", "TURNO": "T3", "CLAVE": "MACOTN" },
+                { "Nombre": "Lavado de Contenedores", "SERVICIO": "LACO", "TURNO": "T3", "CLAVE": "LACOTN" },
+                { "Nombre": "Lavado de Calzadas o Veredas", "SERVICIO": "LAVA", "TURNO": "T3", "CLAVE": "LAVATN" },
+                { "Nombre": "Lavado de Cestos Papeleros", "SERVICIO": "LACE", "TURNO": "T3", "CLAVE": "LACETN" },
+            ]
+        };
+
+        window.onload = function() {
+            map = L.map('mapa', {
+                renderer: L.canvas()
+            }).setView([-34.6395, -58.3871], 15);
+            
+            // --- MAPA BASE ORIGINAL ---
+            L.tileLayer('teselas/{z}/{x}/{y}.png', {
+                minZoom: 6,
+                maxZoom: 18,
+                tms: false
+            }).addTo(map);
+            // --------------------------
+
+            markersLayer.addTo(map);
+            generarBotonesServicio(); 
+        };
+
+        // --- Generar botones de acción directa ---
+        function generarBotonesServicio() {
+            const contenedorPrincipal = document.getElementById("contenedor-botones");
+            contenedorPrincipal.innerHTML = ""; // Limpiar contenedor
+            
+            for (const turno in filtrosData) {
+                // Crear contenedor para el grupo de botones del turno
+                let grupoDiv = document.createElement("div");
+                grupoDiv.className = "filtro-grupo";
+                grupoDiv.innerHTML = `<span class="filtro-titulo">${turno}</span>`;
+
+                // NUEVO: Contenedor flex para los botones de este turno (una columna)
+                let colDiv = document.createElement("div");
+                colDiv.className = "contenedor-botones-col"; 
+
+                filtrosData[turno].forEach(servicio => {
+                    // Crear el botón
+                    let btn = document.createElement("button");
+                    btn.className = "btn-servicio";
+                    btn.innerText = servicio.Nombre;
+                    
+                    // Definir la acción al hacer clic
+                    btn.onclick = function() {
+                        iniciarGeocodificacionPorServicio(servicio);
+                    };
+                    
+                    // Añadir botón al contenedor de columna
+                    colDiv.appendChild(btn); 
+                });
+                
+                // Añadir columna al grupo y grupo al contenedor principal
+                grupoDiv.appendChild(colDiv); 
+                contenedorPrincipal.appendChild(grupoDiv);
+            }
+        }
+        // --- Función principal modificada para aceptar un servicio directo ---
+        function iniciarGeocodificacionPorServicio(servicioSeleccionado) {
+            if (typeof callesData === 'undefined' || typeof reclamosData === 'undefined' || typeof rutasData === 'undefined') {
+                alert("Error: Faltan cargar los archivos de datos (CALLES, RECLAMOS o RUTAS).");
+                return;
+            }
+
+            markersLayer.clearLayers();
+
+            const normalizar = (texto) => {
+                if(!texto) return "";
+                return texto.toString().trim().toUpperCase();
+            };
+
+            console.log(`--- Iniciando geocodificación para: ${servicioSeleccionado.CLAVE} ---`);
+
+            let encontrados = 0;
+            let fallidos = 0;
+
+            reclamosData.features.forEach((reclamo) => {
+                const p = reclamo.properties;
+                
+                // Filtrado directo por turno y servicio
+                if (p.TURNO !== servicioSeleccionado.TURNO || p.SERVICIO !== servicioSeleccionado.SERVICIO) return;
+                
+                const direccionCompleta = p.DIRECCION;
+                if (!direccionCompleta) return;
+                
+                const partes = direccionCompleta.match(/(.*)\s(\d+)$/);
+                if (!partes) return;
+                
+                const calleBuscada = normalizar(partes[1]);
+                const numeroBuscado = parseInt(partes[2]);
+
+                // Búsqueda de segmento de calle
+                const segmentoCalle = callesData.features.find(f => {
+                    if (!f.properties.Street) return false;
+                    const calleEnCalle = normalizar(f.properties.Street);
+                    if (calleEnCalle !== calleBuscada) return false;
+
+                    const pCalle = f.properties;
+                    return (numeroBuscado >= pCalle.Fromleft && numeroBuscado <= pCalle.Toleft) || 
+                           (numeroBuscado >= pCalle.Fromright && numeroBuscado <= pCalle.Toright);
+                });
+
+                if (segmentoCalle) {
+                    const pCalle = segmentoCalle.properties;
+                    let desde = Math.min(pCalle.Fromleft, pCalle.Fromright);
+                    let hasta = Math.max(pCalle.Toleft, pCalle.Toright);
+                    let porcentaje = (hasta - desde !== 0) ? (numeroBuscado - desde) / (hasta - desde) : 0.5;
+                    porcentaje = Math.max(0, Math.min(1, porcentaje));
+
+                    const coords = segmentoCalle.geometry.coordinates[0];
+                    const latlng = calcularPuntoEnLineaPorDistancia(coords, porcentaje);
+
+                    // --- Búsqueda de Ruta ---
+                    let areaEncontrada = "0";
+                    let idSegmento = String(pCalle.Id); 
+                    let claveCampo = servicioSeleccionado.CLAVE; // Ej: "RDOMTM"
+
+                    // Búsqueda en FeatureCollection RUTAS.js
+                    let featureRuta = rutasData.features.find(f => String(f.properties.Id) === idSegmento);
+
+                    if (featureRuta) {
+                        console.log("Segmento encontrado en RUTAS.js:", featureRuta.properties);
+                        areaEncontrada = featureRuta.properties[claveCampo];
+                        
+                        if (areaEncontrada === null || areaEncontrada === undefined || areaEncontrada === "") {
+                            areaEncontrada = "0";
+                        }
+                    } else {
+                        console.warn(`ID ${idSegmento} NO encontrado en RUTAS.js`);
+                    }
+                    p.AREA_ASIGNADA = areaEncontrada;
+
+                    // Crear marcador
+                    L.circleMarker(latlng, {
+                        radius: 7,
+                        fillColor: "#ff0000",
+                        color: "#000",
+                        weight: 1,
+                        opacity: 1,
+                        fillOpacity: 0.8
+                    })
+                    .addTo(markersLayer)
+                    .bindPopup(`<b>${p.CODIGO}</b><br>${direccionCompleta}<br>Solicitud: ${p.SOLICITUD}<br>ID: ${idSegmento}<br>Ruta: ${p.AREA_ASIGNADA}`);
+
+                    encontrados++;
+                } else {
+                    fallidos++;
+                }
+            });
+            console.log(`--- Proceso finalizado. Ubicados: ${encontrados}, Fallidos: ${fallidos} ---`);
+        }
+
+        // --- Función matemática (Aleja de esquinas) ---
+        function calcularPuntoEnLineaPorDistancia(coords, porcentaje) {
+            if (coords.length < 2) return [coords[0][1], coords[0][0]];
+            
+            // Restringir rango para alejar de esquinas (20% margen)
+            let porcentajeAjustado = 0.2 + (porcentaje * 0.6); 
+
+            let distancias = [];
+            let distanciaTotal = 0;
+            for (let i = 0; i < coords.length - 1; i++) {
+                let d = Math.sqrt(Math.pow(coords[i+1][0] - coords[i][0], 2) + Math.pow(coords[i+1][1] - coords[i][1], 2));
+                distancias.push(d);
+                distanciaTotal += d;
+            }
+            
+            let distanciaObjetivo = porcentajeAjustado * distanciaTotal;
+            let distanciaAcumulada = 0;
+            
+            for (let i = 0; i < distancias.length; i++) {
+                if (distanciaAcumulada + distancias[i] >= distanciaObjetivo) {
+                    let porcentajeSegmento = (distanciaObjetivo - distanciaAcumulada) / distancias[i];
+                    let lat = coords[i][1] + (coords[i+1][1] - coords[i][1]) * porcentajeSegmento;
+                    let lng = coords[i][0] + (coords[i+1][0] - coords[i][0]) * porcentajeSegmento;
+                    return [lat, lng];
+                }
+                distanciaAcumulada += distancias[i];
+            }
+            return [coords[coords.length-1][1], coords[coords.length-1][0]];
+        }
+    </script>
+</body>
+</html>
