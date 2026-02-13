@@ -10,6 +10,21 @@
     <style>
         body { margin: 0; padding: 0; display: flex; height: 100vh; overflow: hidden; font-family: sans-serif; }
         
+        .direccion-label {
+            background-color: #ffeb3b; 
+            color: #000;
+            font-weight: bold;
+            font-size: 11px;
+            padding: 2px 4px;
+            border: 1px solid #999;
+            border-radius: 4px;
+            white-space: nowrap; /* Mantiene el texto en una línea */
+            box-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+            
+            /* Importante para el posicionamiento fijo */
+            position: absolute;
+        }
+
         #panel-lateral { 
             width: 280px; /* Un poco más angosto el panel */
             background: #f4f4f4; 
@@ -68,6 +83,7 @@
         .btn-servicio:active { background-color: #004494; }
 
     </style>
+    <script src="https://unpkg.com/leaflet-image@0.0.4/leaflet-image.js"></script>
 </head>
 <body>
 
@@ -76,6 +92,18 @@
         <p style="font-size: 12px; color: #666;">Seleccione un servicio para geocodificar en el mapa:</p>
         
         <div id="contenedor-botones"></div>
+        <div id="contenedor-filtros-reporte" style="margin-top: 15px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; background-color: #f9f9f9;">
+            <div style="font-weight: bold; margin-bottom: 5px;">Opciones de reporte:</div>
+            <label style="display: block; margin-bottom: 5px;">
+                <input type="checkbox" id="chkIncluirMapa" checked> Incluir mapa
+            </label>
+            <label style="display: block; margin-bottom: 5px;">
+                <input type="checkbox" id="chkSinRutas"> Incluir puntos sin rutas
+            </label>
+            <label style="display: block;">
+                <input type="checkbox" id="chkRutasVacias"> Incluir rutas sin puntos
+            </label>
+        </div>
     </div>
 
     <div id="mapa"></div>
@@ -151,7 +179,8 @@
                     
                     // Definir la acción al hacer clic
                     btn.onclick = function() {
-                        iniciarGeocodificacionPorServicio(servicio);
+                        //iniciarGeocodificacionPorServicio(servicio);
+                        generarReportePorServicio(servicio);
                     };
                     
                     // Añadir botón al contenedor de columna
@@ -163,6 +192,7 @@
                 contenedorPrincipal.appendChild(grupoDiv);
             }
         }
+
         // --- Función principal modificada para aceptar un servicio directo ---
         function iniciarGeocodificacionPorServicio(servicioSeleccionado) {
             if (typeof callesData === 'undefined' || typeof reclamosData === 'undefined' || typeof rutasData === 'undefined') {
@@ -205,7 +235,7 @@
 
                     const pCalle = f.properties;
                     return (numeroBuscado >= pCalle.Fromleft && numeroBuscado <= pCalle.Toleft) || 
-                           (numeroBuscado >= pCalle.Fromright && numeroBuscado <= pCalle.Toright);
+                        (numeroBuscado >= pCalle.Fromright && numeroBuscado <= pCalle.Toright);
                 });
 
                 if (segmentoCalle) {
@@ -223,22 +253,20 @@
                     let idSegmento = String(pCalle.Id); 
                     let claveCampo = servicioSeleccionado.CLAVE; // Ej: "RDOMTM"
 
-                    // Búsqueda en FeatureCollection RUTAS.js
+                    
                     let featureRuta = rutasData.features.find(f => String(f.properties.Id) === idSegmento);
 
+
+
                     if (featureRuta) {
-                        console.log("Segmento encontrado en RUTAS.js:", featureRuta.properties);
                         areaEncontrada = featureRuta.properties[claveCampo];
-                        
                         if (areaEncontrada === null || areaEncontrada === undefined || areaEncontrada === "") {
                             areaEncontrada = "0";
                         }
-                    } else {
-                        console.warn(`ID ${idSegmento} NO encontrado en RUTAS.js`);
                     }
                     p.AREA_ASIGNADA = areaEncontrada;
 
-                    // Crear marcador
+                    // 1. Crear el punto rojo
                     L.circleMarker(latlng, {
                         radius: 7,
                         fillColor: "#ff0000",
@@ -248,7 +276,23 @@
                         fillOpacity: 0.8
                     })
                     .addTo(markersLayer)
-                    .bindPopup(`<b>${p.CODIGO}</b><br>${direccionCompleta}<br>Solicitud: ${p.SOLICITUD}<br>ID: ${idSegmento}<br>Ruta: ${p.AREA_ASIGNADA}`);
+                    .bindPopup(`<b>${p.CODIGO}</b><br>${direccionCompleta}<br>ID: ${idSegmento}<br>Ruta: ${p.AREA_ASIGNADA}`);
+
+                    // 2. --- CORRECCIÓN: Crear la etiqueta ---
+                    let labelIcon = L.divIcon({
+                        className: 'direccion-label',
+                        html: direccionCompleta, // Ya no necesitamos el id aquí
+                        iconSize: null, // Tamaño automático
+                        // --- ESTO ES LA CLAVE ---
+                        // [x, y] -> x: centrado horizontal (0 es izq, necesitamos la mitad del ancho)
+                        // Para centrar con iconSize:null, intentaremos aproximar con un valor fijo
+                        // o ajustar el CSS. Probemos con un valor fijo para el eje X
+                        iconAnchor: [50, 30] // Ajusta estos números si se ven descentrados
+                    });
+
+                    // Creamos el marcador de etiqueta
+                    L.marker(latlng, { icon: labelIcon }).addTo(markersLayer);
+                    // ---------------------------------------------------------------------
 
                     encontrados++;
                 } else {
@@ -258,11 +302,304 @@
             console.log(`--- Proceso finalizado. Ubicados: ${encontrados}, Fallidos: ${fallidos} ---`);
         }
 
-        // --- Función matemática (Aleja de esquinas) ---
-        function calcularPuntoEnLineaPorDistancia(coords, porcentaje) {
-            if (coords.length < 2) return [coords[0][1], coords[0][0]];
+        // --- Generar Reporte con Imagen Fija de Fondo (Corregido) ---
+        function generarReportePorServicio(servicioSeleccionado) {
+            if (typeof reclamosData === 'undefined' || typeof rutasData === 'undefined' || typeof callesData === 'undefined') {
+                alert("Error: Faltan cargar los archivos de datos (CALLES, RECLAMOS o RUTAS).");
+                return;
+            }
+
+            const incluirMapa = document.getElementById('chkIncluirMapa').checked;
+            const incluirSinRutas = document.getElementById('chkSinRutas').checked;
+            const incluirRutasVacias = document.getElementById('chkRutasVacias').checked;
+
+            const normalizar = (texto) => {
+                if(!texto) return "";
+                return texto.toString().trim().toUpperCase();
+            };
+
+            const rutasAgrupadas = {};
+            const geoJSONPorRuta = {};
+
+            // 1. Filtrar y Geocodificar
+            reclamosData.features.forEach(reclamo => {
+                const p = reclamo.properties;
+                
+                if (p.TURNO !== servicioSeleccionado.TURNO || p.SERVICIO !== servicioSeleccionado.SERVICIO) return;
+
+                const direccionCompleta = p.DIRECCION;
+                if (!direccionCompleta) return;
+
+                const partes = direccionCompleta.match(/(.*)\s(\d+)$/);
+                if (!partes) return;
+
+                const calleBuscada = normalizar(partes[1]);
+                const numeroBuscado = parseInt(partes[2]);
+
+                const segmentoCalle = callesData.features.find(f => {
+                    if (!f.properties.Street) return false;
+                    const calleEnCalle = normalizar(f.properties.Street);
+                    if (calleEnCalle !== calleBuscada) return false;
+
+                    const pCalle = f.properties;
+                    return (numeroBuscado >= pCalle.Fromleft && numeroBuscado <= pCalle.Toleft) || 
+                           (numeroBuscado >= pCalle.Fromright && numeroBuscado <= pCalle.Toright);
+                });
+
+                let rutaEncontrada = "Sin Ruta";
+                let latlng = null;
+
+                if (segmentoCalle) {
+                    const pCalle = segmentoCalle.properties;
+                    let idSegmento = String(pCalle.Id);
+                    let claveCampo = servicioSeleccionado.CLAVE;
+
+                    let featureRuta = rutasData.features.find(f => String(f.properties.Id) === idSegmento);
+
+                    if (featureRuta) {
+                        rutaEncontrada = featureRuta.properties[claveCampo] || "Sin Ruta";
+                    }
+
+                    // Geocodificación para obtener coordenadas
+                    let desde = Math.min(pCalle.Fromleft, pCalle.Fromright);
+                    let hasta = Math.max(pCalle.Toleft, pCalle.Toright);
+                    let porcentaje = (hasta - desde !== 0) ? (numeroBuscado - desde) / (hasta - desde) : 0.5;
+                    porcentaje = Math.max(0, Math.min(1, porcentaje));
+                    const coords = segmentoCalle.geometry.coordinates[0];
+                    latlng = calcularPuntoEnLineaPorDistancia(coords, porcentaje);
+                }
+                
+                if (rutaEncontrada === "" || rutaEncontrada === "0") rutaEncontrada = "Sin Ruta";
+                if (rutaEncontrada === "Sin Ruta" && !incluirSinRutas) return;
+
+                if (!rutasAgrupadas[rutaEncontrada]) {
+                    rutasAgrupadas[rutaEncontrada] = [];
+                    geoJSONPorRuta[rutaEncontrada] = [];
+                }
+                rutasAgrupadas[rutaEncontrada].push(p);
+                
+                if (latlng) {
+                    geoJSONPorRuta[rutaEncontrada].push({
+                        type: "Feature",
+                        geometry: { type: "Point", coordinates: [latlng.lng, latlng.lat] },
+                        properties: { direccion: p.DIRECCION, codigo: p.CODIGO }
+                    });
+                }
+            });
+
+            if (incluirRutasVacias) {
+                rutasData.features.forEach(f => {
+                    let nombreRuta = f.properties[servicioSeleccionado.CLAVE];
+                    if (nombreRuta && nombreRuta !== "" && nombreRuta !== "0") {
+                        if (!rutasAgrupadas[nombreRuta]) {
+                            rutasAgrupadas[nombreRuta] = [];
+                            geoJSONPorRuta[nombreRuta] = [];
+                        }
+                    }
+                });
+            }
+
+// 2. Construir el HTML de los reportes
+            let contenidoReportes = "";
+            let mapaScripts = "";
+            let esPrimeraRuta = true;
+
+            for (const ruta in rutasAgrupadas) {
+                
+                let htmlMapa = "";
+                if (incluirMapa) {
+                    let mapaId = "mapa_" + ruta.replace(/[^a-zA-Z0-9]/g, "_");
+                    htmlMapa = '<div id="' + mapaId + '" class="mapa-interactivo"></div>';
+                    
+                    // Script para inicializar cada mapa con CANVA y configuraciones de reporte
+                    mapaScripts += "var " + mapaId + " = L.map('" + mapaId + "', { " +
+                        "renderer: L.canvas()," +
+                        "zoomControl: false," +
+                        "attributionControl: false," +
+                        // --- MODIFICACIÓN: Bloquear toda interacción ---
+                        "dragging: false," +
+                        "touchZoom: false," +
+                        "scrollWheelZoom: false," +
+                        "doubleClickZoom: false," +
+                        "boxZoom: false," +
+                        "keyboard: false," +
+                        "tap: false" +
+                        // ------------------------------------------------
+                    "}).setView([-34.6395, -58.3871], 13);" +
+                    "L.tileLayer('teselas/{z}/{x}/{y}.png').addTo(" + mapaId + ");" +
+                    
+                    "var points = " + JSON.stringify(geoJSONPorRuta[ruta] || []) + ";" +
+                    "if (points.length > 0) {" +
+                        "var geoJsonLayer = L.geoJSON(points, {" +
+                            "pointToLayer: function (feature, latlng) {" +
+                                "return L.circleMarker(latlng, {" +
+                                    "radius: 5," +
+                                    "fillColor: 'red'," +
+                                    "color: 'black'," +
+                                    "weight: 1," +
+                                    "opacity: 1," +
+                                    "fillOpacity: 0.8" +
+                                "});" +
+                            "}," +
+                            "onEachFeature: function (feature, layer) {" +
+                                // --- MODIFICACIÓN: Etiqueta con dirección arriba ---
+                                "layer.bindTooltip(feature.properties.direccion, {" +
+                                    "permanent: true," +
+                                    "direction: 'top'," +
+                                    "className: 'etiqueta-mapa'" +
+                                "});" +
+                                // ---------------------------------------------------
+                            "}" +
+                        "}).addTo(" + mapaId + ");" +
+                        mapaId + ".fitBounds(geoJsonLayer.getBounds().pad(0.1));" +
+                    "}" +
+                    "else {" +
+                        // Centrar mapa si no hay puntos
+                        mapaId + ".setView([-34.6395, -58.3871], 13);" +
+                    "}";
+                }
+                
+                let turno = servicioSeleccionado.TURNO;
+                let saltoDePaginaClass = esPrimeraRuta ? "" : "salto-pagina";
+                esPrimeraRuta = false;
+
+                // Contenido de la tabla de reclamos
+                let filasReclamos = "";
+                if (rutasAgrupadas[ruta].length > 0) {
+                    rutasAgrupadas[ruta].forEach(p => {
+                        filasReclamos += "<tr>" +
+                            "<td class='col-reclamo'>" + p.CODIGO + "</td>" +
+                            "<td class='col-fecha'>" + (p.FECHA || '') + "</td>" +
+                            "<td class='col-direccion'>" + p.DIRECCION + "</td>" +
+                            "<td class='col-solicitud'>" + (p.SOLICITUD || '') + "</td>" +
+                            "<td class='col-resolucion'></td>" +
+                            "<td class='col-codigo'></td>" +
+                            "<td class='col-obs'></td>" +
+                        "</tr>";
+                    });
+                } else {
+                    filasReclamos = "<tr><td colspan='7' style='text-align:center;'>Sin reclamos en esta ruta</td></tr>";
+                }
+
+                contenidoReportes += "<div class='" + saltoDePaginaClass + "'>" +
+                    "<table class='encabezado-tabla'>" +
+                        "<tr>" +
+                            "<td class='col-label'>Servicio:</td>" +
+                            "<td class='col-valor'>" + servicioSeleccionado.Nombre + "</td>" +
+                            "<td class='col-unificada' style='text-align: right;' colspan='2'>PRTIN - 3701 - URBASUR - D01 Vr.2</td>" +
+                        "</tr>" +
+                        "<tr>" +
+                            "<td class='col-label'>Ruta:</td>" +
+                            "<td class='col-valor'>" + ruta + "</td>" +
+                            "<td class='col-label-der'>FECHA:</td>" +
+                            "<td class='col-valor-der'>" + new Date().toLocaleDateString() + "</td>" +
+                        "</tr>" +
+                        "<tr>" +
+                            "<td>Turno:</td>" +
+                            "<td>" + turno + "</td>" +
+                            "<td>SUPERVISOR:</td>" +
+                            "<td>__________________</td>" +
+                        "</tr>" +
+                        "<tr>" +
+                            "<td>Rec/Sol:</td>" +
+                            "<td>" + rutasAgrupadas[ruta].length + "</td>" +
+                            "<td>FIRMA:</td>" +
+                            "<td>__________________</td>" +
+                        "</tr>" +
+                    "</table>" +
+                    
+                    // --- MODIFICACIÓN: Contenedor para tabla ---
+                    "<div class='contenedor-tabla-fijo'>" +
+                        "<table class='tabla-datos'>" +
+                            "<thead>" +
+                                "<tr>" +
+                                    "<th class='col-reclamo'>Nro Reclamo</th>" +
+                                    "<th class='col-fecha'>Fecha</th>" +
+                                    "<th class='col-direccion'>Dirección</th>" +
+                                    "<th class='col-solicitud'>Solicitud</th>" +
+                                    "<th class='col-resolucion'>Hora Resol</th>" +
+                                    "<th class='col-codigo'>Cód Resol</th>" +
+                                    "<th class='col-obs'>Observaciones</th>" +
+                                "</tr>" +
+                            "</thead>" +
+                            "<tbody>" + filasReclamos + "</tbody>" +
+                        "</table>" +
+                    "</div>" +
+                    // -------------------------------------------
+                    
+                    // --- MODIFICACIÓN: Estructura mapa y leyenda ---
+                    "<div class='leyenda-referencias'>" +
+                        "REFERENCIAS DE RESOLUCIÓN: 02 - DIRECCIÓN INEXISTENTE / 04 - NADA EN EL LUGAR / 06 - NO OPERABLE / 08 - NO CORRESPONDE / 10 - CUMPLIDO" +
+                    "</div>" +
+                    htmlMapa + // Aquí ya no necesitas el ID en htmlMapa, solo el div.
+                    // -----------------------------------------------
+                "</div>";
+            }
+
+            // 3. Construir el HTML final 
+            const cssEstilos = "body { font-family: sans-serif; font-size: 12px; margin: 20px; } " +
+                ".encabezado-tabla { width: 100%; border: 1px solid black; border-collapse: collapse; margin-bottom: 3px; font-weight: bold; font-size: 16px; color: blue; table-layout: fixed; } " +
+                ".encabezado-tabla td { height: 23px; padding: 0 5px; vertical-align: middle; border: 1px solid black; } " +
+                
+                // --- MODIFICACIÓN: Contenedor tabla con alto fijo ---
+                ".contenedor-tabla-fijo { height: 500px; overflow: hidden; position: relative; } " +
+                // ---------------------------------------------------
+                
+                ".tabla-datos { width: 100%; border: 1px solid black; border-collapse: collapse; table-layout: fixed; } " +
+                ".tabla-datos th, .tabla-datos td { height: 15px; border: 1px solid black; padding: 4px; text-align: left; font-size: 12px; vertical-align: middle; } " +
+                ".tabla-datos th { background-color: #e0e0e0; } " +
+                ".col-reclamo { width: 9%; } " +
+                ".col-fecha { width: 8%; } " +
+                ".col-direccion { width: 30%; } " +
+                ".col-solicitud { width: 20%; } " +
+                ".col-resolucion { width: 9%; } " +
+                ".col-codigo { width: 9%; } " +
+                ".col-obs { width: 15%; } " +
+                
+                ".etiqueta-mapa { background: #ffffcc; border: 1px solid #ffcc00; font-size: 10px; color: black; padding: 2px; white-space: nowrap; font-weight: bold; } " +
+                
+                // --- MODIFICACIÓN: Posicionamiento absoluto para mapa y leyenda ---
+                ".mapa-interactivo { height: 16cm; width: 100%; position: absolute; bottom: 0; left: 0; border: 1px solid #999; } " +
+                ".leyenda-referencias { position: absolute; bottom: 16cm; left: 0; right: 0; padding: 5px; border: 1px solid black; text-align: center; font-size: 10px; background-color: white; } " +
+                // ------------------------------------------------------------------
+                
+                "@media print { " +
+                    "body { margin: 0; } " +
+                    ".salto-pagina { page-break-before: always; break-before: page; } " +
+                    ".mapa-interactivo { -webkit-print-color-adjust: exact; print-color-adjust: exact; } " +
+                "}";
+
+            const reporteHTML = "<html>" +
+                "<head>" +
+                    "<title>Reporte Servicio " + servicioSeleccionado.Nombre + "</title>" +
+                    "<link rel='stylesheet' href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css' />" +
+                    "<style>" + cssEstilos + "</style>" +
+                    "<script src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'><\/script>" +
+                "</head>" +
+                "<body>" +
+                    contenidoReportes +
+                    "<script>" + mapaScripts + "<\/script>" +
+                "</body>" +
+                "</html>";
+
+            // 4. Abrir ventana e imprimir
+            const ventanaReporte = window.open('', 'ReporteUnico', 'width=1000,height=900');
+            ventanaReporte.document.write(reporteHTML);
+            ventanaReporte.document.close();
             
-            // Restringir rango para alejar de esquinas (20% margen)
+            ventanaReporte.onload = function() {
+                // --- MODIFICACIÓN: 1 segundo de espera ---
+                setTimeout(function() {
+                    ventanaReporte.print();
+                }, 1000);
+                // -----------------------------------------
+            };
+        }
+
+        // --- Función matemática ---
+        function calcularPuntoEnLineaPorDistancia(coords, porcentaje) {
+            if (coords.length < 2) return {lat: coords[0][1], lng: coords[0][0]};
+            
             let porcentajeAjustado = 0.2 + (porcentaje * 0.6); 
 
             let distancias = [];
@@ -281,11 +618,11 @@
                     let porcentajeSegmento = (distanciaObjetivo - distanciaAcumulada) / distancias[i];
                     let lat = coords[i][1] + (coords[i+1][1] - coords[i][1]) * porcentajeSegmento;
                     let lng = coords[i][0] + (coords[i+1][0] - coords[i][0]) * porcentajeSegmento;
-                    return [lat, lng];
+                    return {lat: lat, lng: lng};
                 }
                 distanciaAcumulada += distancias[i];
             }
-            return [coords[coords.length-1][1], coords[coords.length-1][0]];
+            return {lat: coords[coords.length-1][1], lng: coords[coords.length-1][0]};
         }
     </script>
 </body>
