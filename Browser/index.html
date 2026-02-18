@@ -68,22 +68,18 @@
 <body>
     <div id="panel-lateral">
         <h3>Procesar Reclamos</h3>
-        <div style="margin-bottom: 15px;">
-            <p id="estado-carga" onclick="recargarDatos()" style="font-size: 12px; color: #666; font-weight: bold; cursor: pointer; display: inline-block; padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; background: #f9f9f9; margin-bottom: 5px;">
-                ESPERANDO DATOS...
-            </p>
-            <br>
-            <small id="ultima-actualizacion" style="color: #888; font-style: italic; font-size: 10px;">
-                Última carga: --/--/---- --:--
-            </small>
+        <div style="margin-bottom: 1px;">
+            <p id="estado-carga" onclick="recargarDatos()" style="font-size: 12px; color: rgb(40, 167, 69); font-weight: bold; cursor: pointer; display: inline-block; padding: 5px 10px; border: 1px solid rgb(204, 204, 204); border-radius: 4px; background: rgb(249, 249, 249); margin-bottom: 5px;">CARGANDO...</p>
+            <small id="fecha-edicion" style="display:block; font-size:10px; color:#666;">EXPORTACIÓN: --</small>
+            <small id="fecha-exportacion" style="display:block; font-size:10px; color:#666;">SUBIDA: --</small>
         </div>
         <div id="contenedor-botones"></div>
-        <div id="contenedor-filtros-reporte" style="margin-top: 15px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; background-color: #f9f9f9;">
-            <div style="font-weight: bold; margin-bottom: 5px;">Opciones de reporte:</div>
-            <label style="display: block; margin-bottom: 5px;">
+        <div id="contenedor-filtros-reporte" style="margin-top: 2px; padding: 2px; border: 1px solid #ccc; border-radius: 5px; background-color: #f9f9f9;">
+            <div style="font-weight: bold; margin-bottom: 2px;">Opciones de reporte:</div>
+            <label style="display: block; margin-bottom: 2px;">
                 <input type="checkbox" id="chkIncluirMapa" checked> Incluir mapa
             </label>
-            <label style="display: block; margin-bottom: 5px;">
+            <label style="display: block; margin-bottom: 2px;">
                 <input type="checkbox" id="chkSinRutas"> Incluir puntos sin rutas
             </label>
             <label style="display: block;">
@@ -131,8 +127,8 @@
             // 3. Primera carga de datos
             recargarDatos();
         };
-// 1sJKDOy6VGya8RNNz7cNLnheuq_x1yqIJ4nvnQMnTvio
-
+        
+        // 1sJKDOy6VGya8RNNz7cNLnheuq_x1yqIJ4nvnQMnTvio
         function recargarDatos() {
             const etiquetaEstado = document.getElementById("estado-carga");
             const idPlanilla = "1sJKDOy6VGya8RNNz7cNLnheuq_x1yqIJ4nvnQMnTvio";
@@ -162,19 +158,42 @@
             document.body.appendChild(scriptDatos);
         }
 
-        // NUEVA FUNCIÓN PARA LA HORA
         window.procesarHora = function(datos) {
             try {
-                const celdaHora = datos.table.rows[0].c[1].f; // Lee la celda B1 formateada
-                const etiquetaHora = document.getElementById("ultima-actualizacion");
-                if (etiquetaHora) {
-                    etiquetaHora.innerText = "Excel actualizado el: " + celdaHora;
-                }
+                const filas = datos.table.rows;
+
+                // Función interna para formatear el dato de Google
+                const formatearFechaGoogle = (celda) => {
+                    if (!celda) return "Sin datos";
+                    // Si Google ya nos da el valor formateado como texto (f), lo usamos
+                    if (celda.f) return celda.f;
+                    // Si es un objeto Date de Google, lo convertimos a string legible
+                    if (celda.v && celda.v.toString().includes("Date")) {
+                        // Extraemos los números del string "Date(2026,0,21...)"
+                        const match = celda.v.match(/\d+/g);
+                        if (match) {
+                            const d = match[2].padStart(2, '0');
+                            const m = (parseInt(match[1]) + 1).toString().padStart(2, '0'); // Meses en JS son 0-11
+                            const a = match[0];
+                            const h = match[3].padStart(2, '0');
+                            const min = match[4].padStart(2, '0');
+                            const seg = match[5].padStart(2, '0');
+                            return `${d}/${m}/${a} ${h}:${min}:${seg}`;
+                        }
+                    }
+                    return celda.v; // Por si ya viene limpio
+                };
+
+                const edicion = formatearFechaGoogle(filas[0].c[1]);    // Celda B1
+                const exportacion = formatearFechaGoogle(filas[1].c[1]); // Celda B2
+
+                document.getElementById("fecha-edicion").innerText = "EXPORTACIÓN: " + edicion;
+                document.getElementById("fecha-exportacion").innerText = "SUBIDA: " + exportacion;
+
             } catch (e) {
-                console.log("No se pudo leer la hora de modificación");
+                console.error("Error al formatear fechas:", e);
             }
         };
-
         // ESTA ES LA FUNCIÓN QUE TRADUCE LOS DATOS DE GOOGLE
         window.procesarJSONP = function(datos) {
             const etiquetaEstado = document.getElementById("estado-carga");
