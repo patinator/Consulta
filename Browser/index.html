@@ -111,43 +111,18 @@
                 { "Nombre": "Lavado de Cestos Papeleros", "SERVICIO": "LACE", "TURNO": "T3", "CLAVE": "LACETN" },
             ]
         };
-        window.onload = function() {
-            // Inicializar mapa...
-            map = L.map('mapa', { renderer: L.canvas() }).setView([-34.6395, -58.3871], 15);
-            L.tileLayer('teselas/{z}/{x}/{y}.png', { minZoom: 7, maxZoom: 18 }).addTo(map);
-            markersLayer.addTo(map);
-            
-            // Referencia al párrafo de estado
+        
+        window.procesarJSONP = function(datos) {
+            console.log("¡Respuesta de Google recibida!"); // Esto DEBE aparecer en consola
             const etiquetaEstado = document.getElementById("estado-carga");
-            etiquetaEstado.innerText = "CARGANDO RECLAMOS...";
-            etiquetaEstado.style.color = "#ffa500"; // Naranja mientras carga
-
-            // Cargar datos vía JSONP
-            const idPlanilla = "1SXsGaisv1DkKzyBF0wOVDmVZXX3djSmSJNTS70MIZdB5O_wK200Uo55t0xN7hxisL-y2cyIWbyF-F0";
-            const urlScript = `https://docs.google.com/spreadsheets/d/${idPlanilla}/gviz/tq?tqx=responseHandler:procesarJSONP`;
             
-            const script = document.createElement('script');
-            script.src = urlScript;
-            // Manejo de error de red (si no hay internet o link roto)
-            script.onerror = function() {
-                etiquetaEstado.innerText = "PROBLEMA AL CARGAR DATOS";
-                etiquetaEstado.style.color = "red";
-            };
-            document.body.appendChild(script);
-
-            generarBotonesServicio(); 
-        };
-
-        function procesarJSONP(datos) {
-            const etiquetaEstado = document.getElementById("estado-carga");
             try {
                 const filas = datos.table.rows;
-                const features = filas.map((fila) => {
+                const nuevosFeatures = filas.map(fila => {
                     const v = fila.c;
                     const leer = (idx) => (v[idx] && v[idx].v !== null) ? String(v[idx].v).trim() : "";
                     
-                    const direccion = leer(3); 
-                    if (!direccion) return null;
+                    if (!v || !leer(3)) return null; // Si no hay dirección, saltar
 
                     return {
                         "type": "Feature",
@@ -155,7 +130,7 @@
                             "FECHA": v[0] ? (v[0].f || v[0].v) : "",
                             "SERVICIO": leer(1),
                             "TURNO": leer(2),
-                            "DIRECCION": direccion,
+                            "DIRECCION": leer(3),
                             "SOLICITUD": leer(4),
                             "CODIGO": leer(5),
                             "AREA_ASIGNADA": "0" 
@@ -163,18 +138,48 @@
                     };
                 }).filter(f => f !== null);
 
-                reclamosData.features = features;
-
-                // ÉXITO: Mostramos el conteo
-                etiquetaEstado.innerText = reclamosData.features.length + " RECLAMOS CARGADOS";
-                etiquetaEstado.style.color = "#28a745"; // Verde éxito
-
-            } catch (error) {
-                console.error("Error procesando JSONP:", error);
-                etiquetaEstado.innerText = "PROBLEMA AL CARGAR DATOS";
-                etiquetaEstado.style.color = "red";
+                reclamosData.features = nuevosFeatures;
+                
+                if (etiquetaEstado) {
+                    etiquetaEstado.innerText = reclamosData.features.length + " RECLAMOS CARGADOS";
+                    etiquetaEstado.style.color = "#28a745";
+                }
+            } catch (e) {
+                console.error("Error dentro de procesarJSONP:", e);
+                if (etiquetaEstado) etiquetaEstado.innerText = "ERROR EN DATOS";
             }
-        }
+        };
+
+        // 2. INICIALIZAR TODO AL CARGAR LA VENTANA
+        window.onload = function() {
+            // Configuración mapa
+            map = L.map('mapa', { renderer: L.canvas() }).setView([-34.6395, -58.3871], 15);
+            L.tileLayer('teselas/{z}/{x}/{y}.png', { minZoom: 7, maxZoom: 18 }).addTo(map);
+            markersLayer.addTo(map);
+
+            const etiquetaEstado = document.getElementById("estado-carga");
+            etiquetaEstado.innerText = "CARGANDO RECLAMOS...";
+
+            // 3. INYECTAR EL SCRIPT DE GOOGLE
+            const idPlanilla = "1SXsGaisv1DkKzyBF0wOVDmVZXX3djSmSJNTS70MIZdB5O_wK200Uo55t0xN7hxisL-y2cyIWbyF-F0";
+            const urlScript = "https://docs.google.com/spreadsheets/d/" + idPlanilla + "/gviz/tq?tqx=responseHandler:procesarJSONP";
+            
+            const script = document.createElement('script');
+            script.type = 'text/javascript';
+            script.src = urlScript;
+            
+            // Si hay un error de red (CORS o 404), esto avisará
+            script.onerror = function() {
+                console.error("El script de Google no pudo cargarse.");
+                etiquetaEstado.innerText = "PROBLEMA DE RED / GOOGLE";
+                etiquetaEstado.style.color = "red";
+            };
+
+            document.getElementsByTagName('head')[0].appendChild(script);
+
+            generarBotonesServicio(); 
+        };
+
         function generarBotonesServicio() {
             const contenedorPrincipal = document.getElementById("contenedor-botones");
             contenedorPrincipal.innerHTML = "";
