@@ -70,8 +70,16 @@
         <h3>Procesar Reclamos</h3>
         <div style="margin-bottom: 1px;">
             <p id="estado-carga" onclick="recargarDatos()" style="font-size: 12px; color: rgb(40, 167, 69); font-weight: bold; cursor: pointer; display: inline-block; padding: 5px 10px; border: 1px solid rgb(204, 204, 204); border-radius: 4px; background: rgb(249, 249, 249); margin-bottom: 5px;">CARGANDO...</p>
-            <small id="fecha-edicion" style="display:block; font-size:10px; color:#666;">EXPORTACIÓN: --</small>
-            <small id="fecha-exportacion" style="display:block; font-size:10px; color:#666;">SUBIDA: --</small>
+            <table style="display:block; font-size:10px; color:#666;">
+                <tr>
+                    <td>EXPORTACIÓN:</td>
+                    <td id="fecha-edicion">--</td>
+                </tr>
+                <tr>
+                    <td>SUBIDA:</td>
+                    <td id="fecha-exportacion">--</td>
+                </tr>
+            </table>
         </div>
         <div id="contenedor-botones"></div>
         <div id="contenedor-filtros-reporte" style="margin-top: 2px; padding: 2px; border: 1px solid #ccc; border-radius: 5px; background-color: #f9f9f9;">
@@ -187,8 +195,8 @@
                 const edicion = formatearFechaGoogle(filas[0].c[1]);    // Celda B1
                 const exportacion = formatearFechaGoogle(filas[1].c[1]); // Celda B2
 
-                document.getElementById("fecha-edicion").innerText = "EXPORTACIÓN: " + edicion;
-                document.getElementById("fecha-exportacion").innerText = "SUBIDA: " + exportacion;
+                document.getElementById("fecha-edicion").innerText = edicion;
+                document.getElementById("fecha-exportacion").innerText = exportacion;
 
             } catch (e) {
                 console.error("Error al formatear fechas:", e);
