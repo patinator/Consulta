@@ -69,7 +69,10 @@
     <div id="panel-lateral">
         <h3>Procesar Reclamos</h3>
         <div style="margin-bottom: 1px;">
-            <p id="estado-carga" onclick="recargarDatos()" style="font-size: 12px; color: rgb(40, 167, 69); font-weight: bold; cursor: pointer; display: inline-block; padding: 5px 10px; border: 1px solid rgb(204, 204, 204); border-radius: 4px; background: rgb(249, 249, 249); margin-bottom: 5px;">CARGANDO...</p>
+            <p id="estado-carga" onclick="recargarDatos()" 
+                style="font-size: 12px; font-weight: bold; cursor: pointer; display: inline-block; padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; background: #f9f9f9; transition: all 0.3s ease;">
+                    ESPERANDO DATOS...
+            </p>
             <table style="display:block; font-size:10px; color:#666;">
                 <tr>
                     <td>EXPORTACIÓN:</td>
@@ -141,8 +144,12 @@
             const etiquetaEstado = document.getElementById("estado-carga");
             const idPlanilla = "1sJKDOy6VGya8RNNz7cNLnheuq_x1yqIJ4nvnQMnTvio";
             
+            // --- ESTADO: ACTUALIZANDO (NARANJA) ---
             etiquetaEstado.innerText = "SINCRONIZANDO...";
-            
+            etiquetaEstado.style.color = "#d97706"; // Naranja oscuro para legibilidad
+            etiquetaEstado.style.backgroundColor = "#fef3c7"; // Fondo crema/naranja suave
+            etiquetaEstado.style.borderColor = "#f59e0b";
+                    
             // 1. LIMPIAR SCRIPTS VIEJOS
             const scripts = document.querySelectorAll('.google-script');
             scripts.forEach(s => s.remove());
@@ -192,8 +199,8 @@
                     return celda.v; // Por si ya viene limpio
                 };
 
-                const edicion = formatearFechaGoogle(filas[0].c[1]);    // Celda B1
-                const exportacion = formatearFechaGoogle(filas[1].c[1]); // Celda B2
+                const edicion = formatearFechaGoogle(filas[0].c[1]);
+                const exportacion = formatearFechaGoogle(filas[1].c[1]);
 
                 document.getElementById("fecha-edicion").innerText = edicion;
                 document.getElementById("fecha-exportacion").innerText = exportacion;
@@ -247,8 +254,9 @@
                 // Actualizamos el botón con el conteo final
                 if (etiquetaEstado) {
                     etiquetaEstado.innerText = reclamosData.features.length + " RECLAMOS CARGADOS (ACTUALIZAR)";
-                    etiquetaEstado.style.color = "#28a745";
-                    etiquetaEstado.style.background = "#f9f9f9";
+                    etiquetaEstado.style.color = "#15803d"; // Verde oscuro
+                    etiquetaEstado.style.backgroundColor = "#dcfce7"; // Verde muy claro
+                    etiquetaEstado.style.borderColor = "#22c55e";
                 }
                 
                 console.log("Datos cargados: " + reclamosData.features.length);
@@ -256,8 +264,10 @@
             } catch (error) {
                 console.error("Error en procesarJSONP:", error);
                 if (etiquetaEstado) {
-                    etiquetaEstado.innerText = "ERROR AL PROCESAR DATOS";
-                    etiquetaEstado.style.color = "red";
+                    etiquetaEstado.innerText = "PROBLEMA AL CARGAR DATOS";
+                    etiquetaEstado.style.color = "#b91c1c"; // Rojo oscuro
+                    etiquetaEstado.style.backgroundColor = "#fee2e2"; // Rojo muy claro
+                    etiquetaEstado.style.borderColor = "#ef4444";
                 }
             }
         };
