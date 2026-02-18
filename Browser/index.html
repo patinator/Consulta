@@ -68,7 +68,15 @@
 <body>
     <div id="panel-lateral">
         <h3>Procesar Reclamos</h3>
-        <p id="estado-carga" style="font-size: 12px; color: #666; font-weight: bold;">CARGANDO RECLAMOS...</p>
+        <div style="margin-bottom: 15px;">
+            <p id="estado-carga" onclick="recargarDatos()" style="font-size: 12px; color: #666; font-weight: bold; cursor: pointer; display: inline-block; padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; background: #f9f9f9; margin-bottom: 5px;">
+                ESPERANDO DATOS...
+            </p>
+            <br>
+            <small id="ultima-actualizacion" style="color: #888; font-style: italic; font-size: 10px;">
+                Última carga: --/--/---- --:--
+            </small>
+        </div>
         <div id="contenedor-botones"></div>
         <div id="contenedor-filtros-reporte" style="margin-top: 15px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; background-color: #f9f9f9;">
             <div style="font-weight: bold; margin-bottom: 5px;">Opciones de reporte:</div>
@@ -91,7 +99,6 @@
         let map;
         let markersLayer = L.layerGroup();
         let reclamosData = { type: "FeatureCollection", features: [] };
-        const URL_SHEETS_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSXsGaisv1DkKzyBF0wOVDmVZXX3djSmSJNTS70MIZdB5O_wK200Uo55t0xN7hxisL-y2cyIWbyF-F0/pub?gid=0&single=true&output=csv";
         const filtrosData = {
             "Turno Mañana": [
                 { "Nombre": "Recolección Domiciliaria", "SERVICIO": "RDOM", "TURNO": "T3", "CLAVE": "RDOMTM" },
@@ -112,72 +119,120 @@
             ]
         };
         
+        window.onload = function() {
+            // 1. Inicializar mapa (tu código de siempre)
+            map = L.map('mapa', { renderer: L.canvas() }).setView([-34.6395, -58.3871], 15);
+            L.tileLayer('teselas/{z}/{x}/{y}.png', { minZoom: 7, maxZoom: 18 }).addTo(map);
+            markersLayer.addTo(map);
+            
+            // 2. Generar botones de servicio
+            generarBotonesServicio();
+
+            // 3. Primera carga de datos
+            recargarDatos();
+        };
+// 1sJKDOy6VGya8RNNz7cNLnheuq_x1yqIJ4nvnQMnTvio
+
+        function recargarDatos() {
+            const etiquetaEstado = document.getElementById("estado-carga");
+            const idPlanilla = "1sJKDOy6VGya8RNNz7cNLnheuq_x1yqIJ4nvnQMnTvio";
+            
+            etiquetaEstado.innerText = "SINCRONIZANDO...";
+            
+            // 1. LIMPIAR SCRIPTS VIEJOS
+            const scripts = document.querySelectorAll('.google-script');
+            scripts.forEach(s => s.remove());
+
+            // 2. PEDIR LA HORA (Hoja "Control") - gid=ID_DE_TU_HOJA_CONTROL
+            // Normalmente la primera hoja es gid=0, la segunda tiene otro ID. 
+            // Si no sabes el ID, usa el nombre de la hoja:
+            const urlHora = `https://docs.google.com/spreadsheets/d/${idPlanilla}/gviz/tq?tqx=responseHandler:procesarHora&sheet=Control&t=${new Date().getTime()}`;
+            
+            const scriptHora = document.createElement('script');
+            scriptHora.className = 'google-script';
+            scriptHora.src = urlHora;
+            document.body.appendChild(scriptHora);
+
+            // 3. PEDIR LOS DATOS (Hoja principal)
+            const urlDatos = `https://docs.google.com/spreadsheets/d/${idPlanilla}/gviz/tq?tqx=responseHandler:procesarJSONP&sheet=Hoja1&t=${new Date().getTime()}`;
+            
+            const scriptDatos = document.createElement('script');
+            scriptDatos.className = 'google-script';
+            scriptDatos.src = urlDatos;
+            document.body.appendChild(scriptDatos);
+        }
+
+        // NUEVA FUNCIÓN PARA LA HORA
+        window.procesarHora = function(datos) {
+            try {
+                const celdaHora = datos.table.rows[0].c[1].f; // Lee la celda B1 formateada
+                const etiquetaHora = document.getElementById("ultima-actualizacion");
+                if (etiquetaHora) {
+                    etiquetaHora.innerText = "Excel actualizado el: " + celdaHora;
+                }
+            } catch (e) {
+                console.log("No se pudo leer la hora de modificación");
+            }
+        };
+
+        // ESTA ES LA FUNCIÓN QUE TRADUCE LOS DATOS DE GOOGLE
         window.procesarJSONP = function(datos) {
-            console.log("¡Respuesta de Google recibida!"); // Esto DEBE aparecer en consola
             const etiquetaEstado = document.getElementById("estado-carga");
             
             try {
+                // Verificamos que Google haya mandado datos válidos
+                if (!datos || !datos.table || !datos.table.rows) {
+                    throw new Error("Formato de datos no reconocido");
+                }
+
                 const filas = datos.table.rows;
-                const nuevosFeatures = filas.map(fila => {
-                    const v = fila.c;
-                    const leer = (idx) => (v[idx] && v[idx].v !== null) ? String(v[idx].v).trim() : "";
+                
+                // Mapeamos las filas del Sheets a nuestro formato de reclamos
+                const features = filas.map((fila) => {
+                    const v = fila.c; // 'c' es el array de celdas (A, B, C...)
                     
-                    if (!v || !leer(3)) return null; // Si no hay dirección, saltar
+                    // Función para leer celdas sin que el código se rompa si están vacías
+                    const leer = (idx) => {
+                        if (!v || !v[idx] || v[idx].v === null) return "";
+                        return String(v[idx].v).trim();
+                    };
+
+                    const direccion = leer(3); // Columna D (Dirección)
+                    if (!direccion) return null; // Si no hay dirección, ignoramos la fila
 
                     return {
                         "type": "Feature",
                         "properties": {
-                            "FECHA": v[0] ? (v[0].f || v[0].v) : "",
-                            "SERVICIO": leer(1),
-                            "TURNO": leer(2),
-                            "DIRECCION": leer(3),
-                            "SOLICITUD": leer(4),
-                            "CODIGO": leer(5),
+                            "FECHA": v[0] ? (v[0].f || v[0].v) : "", // Col A
+                            "SERVICIO": leer(1),                     // Col B
+                            "TURNO": leer(2),                        // Col C
+                            "DIRECCION": direccion,                  // Col D
+                            "SOLICITUD": leer(4),                    // Col E
+                            "CODIGO": leer(5),                       // Col F
                             "AREA_ASIGNADA": "0" 
                         }
                     };
-                }).filter(f => f !== null);
+                }).filter(f => f !== null); // Filtramos las filas vacías
 
-                reclamosData.features = nuevosFeatures;
-                
+                // Guardamos los reclamos en nuestra variable global
+                reclamosData.features = features;
+
+                // Actualizamos el botón con el conteo final
                 if (etiquetaEstado) {
-                    etiquetaEstado.innerText = reclamosData.features.length + " RECLAMOS CARGADOS";
+                    etiquetaEstado.innerText = reclamosData.features.length + " RECLAMOS CARGADOS (ACTUALIZAR)";
                     etiquetaEstado.style.color = "#28a745";
+                    etiquetaEstado.style.background = "#f9f9f9";
                 }
-            } catch (e) {
-                console.error("Error dentro de procesarJSONP:", e);
-                if (etiquetaEstado) etiquetaEstado.innerText = "ERROR EN DATOS";
+                
+                console.log("Datos cargados: " + reclamosData.features.length);
+
+            } catch (error) {
+                console.error("Error en procesarJSONP:", error);
+                if (etiquetaEstado) {
+                    etiquetaEstado.innerText = "ERROR AL PROCESAR DATOS";
+                    etiquetaEstado.style.color = "red";
+                }
             }
-        };
-
-        // 2. INICIALIZAR TODO AL CARGAR LA VENTANA
-        window.onload = function() {
-            // Configuración mapa
-            map = L.map('mapa', { renderer: L.canvas() }).setView([-34.6395, -58.3871], 15);
-            L.tileLayer('teselas/{z}/{x}/{y}.png', { minZoom: 7, maxZoom: 18 }).addTo(map);
-            markersLayer.addTo(map);
-
-            const etiquetaEstado = document.getElementById("estado-carga");
-            etiquetaEstado.innerText = "CARGANDO RECLAMOS...";
-
-            // 3. INYECTAR EL SCRIPT DE GOOGLE
-            const idPlanilla = "1SXsGaisv1DkKzyBF0wOVDmVZXX3djSmSJNTS70MIZdB5O_wK200Uo55t0xN7hxisL-y2cyIWbyF-F0";
-            const urlScript = "https://docs.google.com/spreadsheets/d/" + idPlanilla + "/gviz/tq?tqx=responseHandler:procesarJSONP";
-            
-            const script = document.createElement('script');
-            script.type = 'text/javascript';
-            script.src = urlScript;
-            
-            // Si hay un error de red (CORS o 404), esto avisará
-            script.onerror = function() {
-                console.error("El script de Google no pudo cargarse.");
-                etiquetaEstado.innerText = "PROBLEMA DE RED / GOOGLE";
-                etiquetaEstado.style.color = "red";
-            };
-
-            document.getElementsByTagName('head')[0].appendChild(script);
-
-            generarBotonesServicio(); 
         };
 
         function generarBotonesServicio() {
