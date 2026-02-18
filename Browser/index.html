@@ -490,6 +490,12 @@
                                 "<td>SUPERVISOR:</td>" +
                                 "<td>__________________</td>" +
                             "</tr>" +
+                            "<tr>" +
+                                "<td>Rec. / Sol. :</td>" +
+                                "<td>" + (rutasAgrupadas[ruta].length || '') + "</td>" +
+                                "<td>FIRMA:</td>" +
+                                "<td>__________________</td>" +
+                            "</tr>" +
                         "</table>" +
                         "<div class='contenedor-tabla'>" +
                             "<table class='tabla-datos'>" +
@@ -499,9 +505,9 @@
                                         "<th class='col-fecha'>Fecha</th>" +
                                         "<th class='col-direccion'>Dirección</th>" +
                                         "<th class='col-solicitud'>Solicitud</th>" +
-                                        "<th>Hora</th>" +
-                                        "<th>Cód</th>" +
-                                        "<th>Obs</th>" +
+                                        "<th class='col-hora'>Hora</th>" +
+                                        "<th class='col-cod'>Cód</th>" +
+                                        "<th class='col-obs'>Obs</th>" +
                                     "</tr>" +
                                 "</thead>" +
                                 "<tbody>" + filasReclamos + "</tbody>" +
@@ -516,12 +522,12 @@
             const cssEstilos = "body { font-family: sans-serif; margin: 0; padding: 0; } " +
                 ".hoja-reporte { width: 29.7cm; height: 42cm; padding: 0.1cm; box-sizing: border-box; display: flex; flex-direction: column; position: relative; page-break-after: always; } " +
                 ".encabezado-tabla { width: 100%; border: 1px solid black; border-collapse: collapse; margin-bottom: 5px; font-weight: bold; font-size: 14px; color: blue; table-layout: fixed; } " +
-                ".encabezado-tabla td { height: 20px; padding: 0 5px;} " +
+                ".encabezado-tabla td { height: 22px; padding: 0 5px;} " +
                 ".contenedor-tabla { flex-grow: 1; overflow: hidden; margin-bottom: 10px; } " +
                 ".tabla-datos { width: 100%; border: 1px solid black; border-collapse: collapse; table-layout: fixed; } " +
                 ".tabla-datos th, .tabla-datos td { height: 18px; border: 1px solid black; padding: 4px; text-align: left; font-size: 11px; } " +
                 ".tabla-datos th { background-color: #e0e0e0; } " +
-                ".col-reclamo { width: 12%; } .col-fecha { width: 10%; } .col-direccion { width: 28%; } .col-solicitud { width: 15%; } " +
+                ".col-reclamo { width: 6%; } .col-fecha { width: 6%; } .col-direccion { width: 30%; } .col-solicitud { width: 25%; } .col-hora { width: 5%; } .col-cod { width: 5%; } .col-obs { width: 23%; } " +
                 ".leyenda-referencias { width: 100%; padding: 5px 0; border: 1px solid black; text-align: center; font-size: 10px; margin-bottom: 2px; } " +
                 ".mapa-interactivo { height: 20cm; width: 100%; border: 1px solid black; } " +
                 ".etiqueta-mapa { background: #ffffcc; border: 1px solid #ffcc00; font-size: 9px; color: black; padding: 1px 3px; font-weight: bold; } " +
