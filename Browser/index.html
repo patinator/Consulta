@@ -4,12 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Geocodificador de Reclamos</title>
-    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    
     <style>
         body { margin: 0; padding: 0; display: flex; height: 100vh; overflow: hidden; font-family: sans-serif; }
-        
         .direccion-label {
             background-color: #ffeb3b; 
             color: #000;
@@ -18,15 +15,12 @@
             padding: 2px 4px;
             border: 1px solid #999;
             border-radius: 4px;
-            white-space: nowrap; /* Mantiene el texto en una línea */
+            white-space: nowrap;
             box-shadow: 1px 1px 2px rgba(0,0,0,0.3);
-            
-            /* Importante para el posicionamiento fijo */
             position: absolute;
         }
-
         #panel-lateral { 
-            width: 280px; /* Un poco más angosto el panel */
+            width: 280px;
             background: #f4f4f4; 
             border-right: 1px solid #ccc; 
             z-index: 1000;
@@ -34,63 +28,47 @@
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
-            gap: 8px; /* Menor espacio entre grupos */
+            gap: 8px; 
             overflow-y: auto;
         }
-
         #mapa { flex-grow: 1; background-color: #fff; }
-        
         h3 { margin: 0 0 5px 0; color: #333; font-size: 18px; }
-
-        .filtro-grupo { margin-bottom: 10px; } /* Menor margen entre grupos */
+        .filtro-grupo { margin-bottom: 10px; } 
         .filtro-titulo { font-weight: bold; margin-bottom: 5px; color: #555; display: block; border-bottom: 1px solid #ccc; padding-bottom: 3px; font-size: 14px; }
-        
-        /* Contenedor de botones (una sola columna) */
         .contenedor-botones-col {
             display: flex;
             flex-direction: column;
-            gap: 4px; /* Menor espacio entre botones */
+            gap: 4px; 
         }
-
-        /* Estilo para los botones de servicio - MÁS ANGOSTOS Y BAJOS */
         .btn-servicio { 
             width: 100%;
-            padding: 5px 2px; /* Menos padding interno */
+            padding: 5px 2px;
             background-color: #007bff; 
             color: white; 
             border: none; 
             cursor: pointer; 
-            font-size: 12px; /* Fuente más pequeña */
+            font-size: 12px;
             border-radius: 4px;
             transition: background-color 0.2s;
-            
-            /* Altura más baja para que quepan todos */
             height: 40px; 
-            
-            /* Centrado de texto */
             display: flex;
             justify-content: center;
             align-items: center;
             text-align: center;
             line-height: 1.1;
-            
-            /* Manejo de texto multilínea */
             word-wrap: break-word;
             white-space: normal;
             overflow: hidden;
         }
         .btn-servicio:hover { background-color: #0056b3; }
         .btn-servicio:active { background-color: #004494; }
-
     </style>
     <script src="https://unpkg.com/leaflet-image@0.0.4/leaflet-image.js"></script>
 </head>
 <body>
-
     <div id="panel-lateral">
         <h3>Procesar Reclamos</h3>
         <p style="font-size: 12px; color: #666;">Seleccione un servicio para geocodificar en el mapa:</p>
-        
         <div id="contenedor-botones"></div>
         <div id="contenedor-filtros-reporte" style="margin-top: 15px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; background-color: #f9f9f9;">
             <div style="font-weight: bold; margin-bottom: 5px;">Opciones de reporte:</div>
@@ -105,20 +83,15 @@
             </label>
         </div>
     </div>
-
     <div id="mapa"></div>
-
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
     <script src="CALLES.js"></script>
-    <script src="RECLAMOS.js"></script>
     <script src="RUTAS.js"></script>
-    
     <script>
         let map;
         let markersLayer = L.layerGroup();
-
-        // --- DATOS DE FILTROS ---
+        let reclamosData = { type: "FeatureCollection", features: [] };
+        const URL_SHEETS_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSXsGaisv1DkKzyBF0wOVDmVZXX3djSmSJNTS70MIZdB5O_wK200Uo55t0xN7hxisL-y2cyIWbyF-F0/pub?gid=0&single=true&output=csv";
         const filtrosData = {
             "Turno Mañana": [
                 { "Nombre": "Recolección Domiciliaria", "SERVICIO": "RDOM", "TURNO": "T3", "CLAVE": "RDOMTM" },
@@ -138,126 +111,118 @@
                 { "Nombre": "Lavado de Cestos Papeleros", "SERVICIO": "LACE", "TURNO": "T3", "CLAVE": "LACETN" },
             ]
         };
-
         window.onload = function() {
-            map = L.map('mapa', {
-                renderer: L.canvas()
-            }).setView([-34.6395, -58.3871], 15);
-            
-            // --- MAPA BASE ORIGINAL ---
-            L.tileLayer('teselas/{z}/{x}/{y}.png', {
-                minZoom: 6,
-                maxZoom: 18,
-                tms: false
-            }).addTo(map);
-            // --------------------------
-
+            map = L.map('mapa', { renderer: L.canvas() }).setView([-34.6395, -58.3871], 15);
+            L.tileLayer('teselas/{z}/{x}/{y}.png', { minZoom: 7, maxZoom: 18 }).addTo(map);
             markersLayer.addTo(map);
+            const idPlanilla = "1sJKDOy6VGya8RNNz7cNLnheuq_x1yqIJ4nvnQMnTvio";
+            const urlScript = `https://docs.google.com/spreadsheets/d/${idPlanilla}/gviz/tq?tqx=responseHandler:procesarJSONP`;
+            const script = document.createElement('script');
+            script.src = urlScript;
+            document.body.appendChild(script);
             generarBotonesServicio(); 
         };
+        function procesarJSONP(datos) {
+            try {
+                const filas = datos.table.rows;
+                
+                const features = filas.map((fila) => {
+                    const v = fila.c; // Array de celdas (A=0, B=1, C=2...)
+                    
+                    // Función auxiliar para evitar errores si la celda está vacía
+                    const leer = (idx) => {
+                        if (!v[idx] || v[idx].v === null || v[idx].v === undefined) return "";
+                        return String(v[idx].v).trim();
+                    };
 
-        // --- Generar botones de acción directa ---
+                    const direccion = leer(3); // Columna D (Índice 3)
+                    if (!direccion) return null;
+
+                    return {
+                        "type": "Feature",
+                        "properties": {
+                            "FECHA": v[0] ? (v[0].f || v[0].v) : "", // Col A (Índice 0)
+                            "SERVICIO": leer(1),                     // Col B (Índice 1)
+                            "TURNO": leer(2),                        // Col C (Índice 2)
+                            "DIRECCION": direccion,                  // Col D (Índice 3)
+                            "SOLICITUD": leer(4),                    // Col E (Índice 4)
+                            "CODIGO": leer(5),                       // Col F (Índice 5)
+                            "AREA_ASIGNADA": "0" 
+                        }
+                    };
+                }).filter(f => f !== null);
+
+                reclamosData.features = features;
+                console.log("Datos mapeados correctamente. Total:", reclamosData.features.length);
+                
+            } catch (error) {
+                console.error("Error procesando JSONP:", error);
+            }
+        }
         function generarBotonesServicio() {
             const contenedorPrincipal = document.getElementById("contenedor-botones");
-            contenedorPrincipal.innerHTML = ""; // Limpiar contenedor
-            
+            contenedorPrincipal.innerHTML = "";
             for (const turno in filtrosData) {
-                // Crear contenedor para el grupo de botones del turno
                 let grupoDiv = document.createElement("div");
                 grupoDiv.className = "filtro-grupo";
                 grupoDiv.innerHTML = `<span class="filtro-titulo">${turno}</span>`;
-
-                // NUEVO: Contenedor flex para los botones de este turno (una columna)
                 let colDiv = document.createElement("div");
                 colDiv.className = "contenedor-botones-col"; 
-
                 filtrosData[turno].forEach(servicio => {
-                    // Crear el botón
                     let btn = document.createElement("button");
                     btn.className = "btn-servicio";
                     btn.innerText = servicio.Nombre;
-                    
-                    // Definir la acción al hacer clic
                     btn.onclick = function() {
-                        //iniciarGeocodificacionPorServicio(servicio);
                         generarReportePorServicio(servicio);
                     };
-                    
-                    // Añadir botón al contenedor de columna
                     colDiv.appendChild(btn); 
                 });
-                
-                // Añadir columna al grupo y grupo al contenedor principal
                 grupoDiv.appendChild(colDiv); 
                 contenedorPrincipal.appendChild(grupoDiv);
             }
         }
-
-        // --- Función principal modificada para aceptar un servicio directo ---
         function iniciarGeocodificacionPorServicio(servicioSeleccionado) {
             if (typeof callesData === 'undefined' || typeof reclamosData === 'undefined' || typeof rutasData === 'undefined') {
                 alert("Error: Faltan cargar los archivos de datos (CALLES, RECLAMOS o RUTAS).");
                 return;
             }
-
             markersLayer.clearLayers();
-
             const normalizar = (texto) => {
                 if(!texto) return "";
                 return texto.toString().trim().toUpperCase();
             };
-
             console.log(`--- Iniciando geocodificación para: ${servicioSeleccionado.CLAVE} ---`);
-
             let encontrados = 0;
             let fallidos = 0;
-
             reclamosData.features.forEach((reclamo) => {
                 const p = reclamo.properties;
-                
-                // Filtrado directo por turno y servicio
                 if (p.TURNO !== servicioSeleccionado.TURNO || p.SERVICIO !== servicioSeleccionado.SERVICIO) return;
-                
                 const direccionCompleta = p.DIRECCION;
                 if (!direccionCompleta) return;
-                
                 const partes = direccionCompleta.match(/(.*)\s(\d+)$/);
                 if (!partes) return;
-                
                 const calleBuscada = normalizar(partes[1]);
                 const numeroBuscado = parseInt(partes[2]);
-
-                // Búsqueda de segmento de calle
                 const segmentoCalle = callesData.features.find(f => {
                     if (!f.properties.Street) return false;
                     const calleEnCalle = normalizar(f.properties.Street);
                     if (calleEnCalle !== calleBuscada) return false;
-
                     const pCalle = f.properties;
                     return (numeroBuscado >= pCalle.Fromleft && numeroBuscado <= pCalle.Toleft) || 
                         (numeroBuscado >= pCalle.Fromright && numeroBuscado <= pCalle.Toright);
                 });
-
                 if (segmentoCalle) {
                     const pCalle = segmentoCalle.properties;
                     let desde = Math.min(pCalle.Fromleft, pCalle.Fromright);
                     let hasta = Math.max(pCalle.Toleft, pCalle.Toright);
                     let porcentaje = (hasta - desde !== 0) ? (numeroBuscado - desde) / (hasta - desde) : 0.5;
                     porcentaje = Math.max(0, Math.min(1, porcentaje));
-
                     const coords = segmentoCalle.geometry.coordinates[0];
                     const latlng = calcularPuntoEnLineaPorDistancia(coords, porcentaje);
-
-                    // --- Búsqueda de Ruta ---
                     let areaEncontrada = "0";
                     let idSegmento = String(pCalle.Id); 
-                    let claveCampo = servicioSeleccionado.CLAVE; // Ej: "RDOMTM"
-
-                    
+                    let claveCampo = servicioSeleccionado.CLAVE;
                     let featureRuta = rutasData.features.find(f => String(f.properties.Id) === idSegmento);
-
-
-
                     if (featureRuta) {
                         areaEncontrada = featureRuta.properties[claveCampo];
                         if (areaEncontrada === null || areaEncontrada === undefined || areaEncontrada === "") {
@@ -265,8 +230,6 @@
                         }
                     }
                     p.AREA_ASIGNADA = areaEncontrada;
-
-                    // 1. Crear el punto rojo
                     L.circleMarker(latlng, {
                         radius: 7,
                         fillColor: "#ff0000",
@@ -277,23 +240,13 @@
                     })
                     .addTo(markersLayer)
                     .bindPopup(`<b>${p.CODIGO}</b><br>${direccionCompleta}<br>ID: ${idSegmento}<br>Ruta: ${p.AREA_ASIGNADA}`);
-
-                    // 2. --- CORRECCIÓN: Crear la etiqueta ---
                     let labelIcon = L.divIcon({
                         className: 'direccion-label',
-                        html: direccionCompleta, // Ya no necesitamos el id aquí
-                        iconSize: null, // Tamaño automático
-                        // --- ESTO ES LA CLAVE ---
-                        // [x, y] -> x: centrado horizontal (0 es izq, necesitamos la mitad del ancho)
-                        // Para centrar con iconSize:null, intentaremos aproximar con un valor fijo
-                        // o ajustar el CSS. Probemos con un valor fijo para el eje X
-                        iconAnchor: [50, 30] // Ajusta estos números si se ven descentrados
+                        html: direccionCompleta,
+                        iconSize: null, 
+                        iconAnchor: [50, 30]
                     });
-
-                    // Creamos el marcador de etiqueta
                     L.marker(latlng, { icon: labelIcon }).addTo(markersLayer);
-                    // ---------------------------------------------------------------------
-
                     encontrados++;
                 } else {
                     fallidos++;
@@ -301,66 +254,47 @@
             });
             console.log(`--- Proceso finalizado. Ubicados: ${encontrados}, Fallidos: ${fallidos} ---`);
         }
-
-        // --- Generar Reporte con Imagen Fija de Fondo (Corregido) ---
         function generarReportePorServicio(servicioSeleccionado) {
             if (typeof reclamosData === 'undefined' || typeof rutasData === 'undefined' || typeof callesData === 'undefined') {
                 alert("Error: Faltan cargar los archivos de datos (CALLES, RECLAMOS o RUTAS).");
                 return;
             }
-
             const incluirMapa = document.getElementById('chkIncluirMapa').checked;
             const incluirSinRutas = document.getElementById('chkSinRutas').checked;
             const incluirRutasVacias = document.getElementById('chkRutasVacias').checked;
-
             const normalizar = (texto) => {
                 if(!texto) return "";
                 return texto.toString().trim().toUpperCase();
             };
-
             const rutasAgrupadas = {};
             const geoJSONPorRuta = {};
-
-            // 1. Filtrar y Geocodificar
             reclamosData.features.forEach(reclamo => {
                 const p = reclamo.properties;
-                
                 if (p.TURNO !== servicioSeleccionado.TURNO || p.SERVICIO !== servicioSeleccionado.SERVICIO) return;
-
                 const direccionCompleta = p.DIRECCION;
                 if (!direccionCompleta) return;
-
                 const partes = direccionCompleta.match(/(.*)\s(\d+)$/);
                 if (!partes) return;
-
                 const calleBuscada = normalizar(partes[1]);
                 const numeroBuscado = parseInt(partes[2]);
-
                 const segmentoCalle = callesData.features.find(f => {
                     if (!f.properties.Street) return false;
                     const calleEnCalle = normalizar(f.properties.Street);
                     if (calleEnCalle !== calleBuscada) return false;
-
                     const pCalle = f.properties;
                     return (numeroBuscado >= pCalle.Fromleft && numeroBuscado <= pCalle.Toleft) || 
                            (numeroBuscado >= pCalle.Fromright && numeroBuscado <= pCalle.Toright);
                 });
-
                 let rutaEncontrada = "Sin Ruta";
                 let latlng = null;
-
                 if (segmentoCalle) {
                     const pCalle = segmentoCalle.properties;
                     let idSegmento = String(pCalle.Id);
                     let claveCampo = servicioSeleccionado.CLAVE;
-
                     let featureRuta = rutasData.features.find(f => String(f.properties.Id) === idSegmento);
-
                     if (featureRuta) {
                         rutaEncontrada = featureRuta.properties[claveCampo] || "Sin Ruta";
                     }
-
-                    // Geocodificación para obtener coordenadas
                     let desde = Math.min(pCalle.Fromleft, pCalle.Fromright);
                     let hasta = Math.max(pCalle.Toleft, pCalle.Toright);
                     let porcentaje = (hasta - desde !== 0) ? (numeroBuscado - desde) / (hasta - desde) : 0.5;
@@ -368,16 +302,13 @@
                     const coords = segmentoCalle.geometry.coordinates[0];
                     latlng = calcularPuntoEnLineaPorDistancia(coords, porcentaje);
                 }
-                
                 if (rutaEncontrada === "" || rutaEncontrada === "0") rutaEncontrada = "Sin Ruta";
                 if (rutaEncontrada === "Sin Ruta" && !incluirSinRutas) return;
-
                 if (!rutasAgrupadas[rutaEncontrada]) {
                     rutasAgrupadas[rutaEncontrada] = [];
                     geoJSONPorRuta[rutaEncontrada] = [];
                 }
                 rutasAgrupadas[rutaEncontrada].push(p);
-                
                 if (latlng) {
                     geoJSONPorRuta[rutaEncontrada].push({
                         type: "Feature",
@@ -386,7 +317,6 @@
                     });
                 }
             });
-
             if (incluirRutasVacias) {
                 rutasData.features.forEach(f => {
                     let nombreRuta = f.properties[servicioSeleccionado.CLAVE];
@@ -398,25 +328,18 @@
                     }
                 });
             }
-
-// 2. Construir el HTML de los reportes
             let contenidoReportes = "";
             let mapaScripts = "";
             let esPrimeraRuta = true;
-
             for (const ruta in rutasAgrupadas) {
-                
                 let htmlMapa = "";
                 if (incluirMapa) {
                     let mapaId = "mapa_" + ruta.replace(/[^a-zA-Z0-9]/g, "_");
                     htmlMapa = '<div id="' + mapaId + '" class="mapa-interactivo"></div>';
-                    
-                    // Script para inicializar cada mapa con CANVA y configuraciones de reporte
                     mapaScripts += "var " + mapaId + " = L.map('" + mapaId + "', { " +
                         "renderer: L.canvas()," +
                         "zoomControl: false," +
                         "attributionControl: false," +
-                        // --- MODIFICACIÓN: Bloquear toda interacción ---
                         "dragging: false," +
                         "touchZoom: false," +
                         "scrollWheelZoom: false," +
@@ -424,10 +347,8 @@
                         "boxZoom: false," +
                         "keyboard: false," +
                         "tap: false" +
-                        // ------------------------------------------------
-                    "}).setView([-34.6395, -58.3871], 13);" +
+                    "}).setView([-34.6395, -58.3871], 14);" +
                     "L.tileLayer('teselas/{z}/{x}/{y}.png').addTo(" + mapaId + ");" +
-                    
                     "var points = " + JSON.stringify(geoJSONPorRuta[ruta] || []) + ";" +
                     "if (points.length > 0) {" +
                         "var geoJsonLayer = L.geoJSON(points, {" +
@@ -442,28 +363,22 @@
                                 "});" +
                             "}," +
                             "onEachFeature: function (feature, layer) {" +
-                                // --- MODIFICACIÓN: Etiqueta con dirección arriba ---
                                 "layer.bindTooltip(feature.properties.direccion, {" +
                                     "permanent: true," +
                                     "direction: 'top'," +
                                     "className: 'etiqueta-mapa'" +
                                 "});" +
-                                // ---------------------------------------------------
                             "}" +
                         "}).addTo(" + mapaId + ");" +
                         mapaId + ".fitBounds(geoJsonLayer.getBounds().pad(0.1));" +
                     "}" +
                     "else {" +
-                        // Centrar mapa si no hay puntos
-                        mapaId + ".setView([-34.6395, -58.3871], 13);" +
+                        mapaId + ".setView([-34.6395, -58.3871], 15);" +
                     "}";
                 }
-                
                 let turno = servicioSeleccionado.TURNO;
                 let saltoDePaginaClass = esPrimeraRuta ? "" : "salto-pagina";
                 esPrimeraRuta = false;
-
-                // Contenido de la tabla de reclamos
                 let filasReclamos = "";
                 if (rutasAgrupadas[ruta].length > 0) {
                     rutasAgrupadas[ruta].forEach(p => {
@@ -480,95 +395,64 @@
                 } else {
                     filasReclamos = "<tr><td colspan='7' style='text-align:center;'>Sin reclamos en esta ruta</td></tr>";
                 }
-
-                contenidoReportes += "<div class='" + saltoDePaginaClass + "'>" +
-                    "<table class='encabezado-tabla'>" +
-                        "<tr>" +
-                            "<td class='col-label'>Servicio:</td>" +
-                            "<td class='col-valor'>" + servicioSeleccionado.Nombre + "</td>" +
-                            "<td class='col-unificada' style='text-align: right;' colspan='2'>PRTIN - 3701 - URBASUR - D01 Vr.2</td>" +
-                        "</tr>" +
-                        "<tr>" +
-                            "<td class='col-label'>Ruta:</td>" +
-                            "<td class='col-valor'>" + ruta + "</td>" +
-                            "<td class='col-label-der'>FECHA:</td>" +
-                            "<td class='col-valor-der'>" + new Date().toLocaleDateString() + "</td>" +
-                        "</tr>" +
-                        "<tr>" +
-                            "<td>Turno:</td>" +
-                            "<td>" + turno + "</td>" +
-                            "<td>SUPERVISOR:</td>" +
-                            "<td>__________________</td>" +
-                        "</tr>" +
-                        "<tr>" +
-                            "<td>Rec/Sol:</td>" +
-                            "<td>" + rutasAgrupadas[ruta].length + "</td>" +
-                            "<td>FIRMA:</td>" +
-                            "<td>__________________</td>" +
-                        "</tr>" +
-                    "</table>" +
-                    
-                    // --- MODIFICACIÓN: Contenedor para tabla ---
-                    "<div class='contenedor-tabla-fijo'>" +
-                        "<table class='tabla-datos'>" +
-                            "<thead>" +
-                                "<tr>" +
-                                    "<th class='col-reclamo'>Nro Reclamo</th>" +
-                                    "<th class='col-fecha'>Fecha</th>" +
-                                    "<th class='col-direccion'>Dirección</th>" +
-                                    "<th class='col-solicitud'>Solicitud</th>" +
-                                    "<th class='col-resolucion'>Hora Resol</th>" +
-                                    "<th class='col-codigo'>Cód Resol</th>" +
-                                    "<th class='col-obs'>Observaciones</th>" +
-                                "</tr>" +
-                            "</thead>" +
-                            "<tbody>" + filasReclamos + "</tbody>" +
+                contenidoReportes += "<div class='hoja-reporte'>" +
+                        "<table class='encabezado-tabla'>" +
+                            "<tr>" +
+                                "<td style='width: 15%'>Servicio:</td>" +
+                                "<td style='width: 45%'>" + servicioSeleccionado.Nombre + "</td>" +
+                                "<td style='text-align: right; width: 40%; color: black' colspan='2'; >PRTIN - 3701 - URBASUR - D01 Vr.2</td>" +
+                            "</tr>" +
+                            "<tr>" +
+                                "<td>Ruta:</td>" +
+                                "<td>" + ruta + "</td>" +
+                                "<td>FECHA:</td>" +
+                                "<td>" + new Date().toLocaleDateString() + "</td>" +
+                            "</tr>" +
+                            "<tr>" +
+                                "<td>Turno:</td>" +
+                                "<td>" + (servicioSeleccionado.TURNO || '') + "</td>" +
+                                "<td>SUPERVISOR:</td>" +
+                                "<td>__________________</td>" +
+                            "</tr>" +
                         "</table>" +
-                    "</div>" +
-                    // -------------------------------------------
-                    
-                    // --- MODIFICACIÓN: Estructura mapa y leyenda ---
-                    "<div class='leyenda-referencias'>" +
-                        "REFERENCIAS DE RESOLUCIÓN: 02 - DIRECCIÓN INEXISTENTE / 04 - NADA EN EL LUGAR / 06 - NO OPERABLE / 08 - NO CORRESPONDE / 10 - CUMPLIDO" +
-                    "</div>" +
-                    htmlMapa + // Aquí ya no necesitas el ID en htmlMapa, solo el div.
-                    // -----------------------------------------------
-                "</div>";
-            }
-
-            // 3. Construir el HTML final 
-            const cssEstilos = "body { font-family: sans-serif; font-size: 12px; margin: 20px; } " +
-                ".encabezado-tabla { width: 100%; border: 1px solid black; border-collapse: collapse; margin-bottom: 3px; font-weight: bold; font-size: 16px; color: blue; table-layout: fixed; } " +
-                ".encabezado-tabla td { height: 23px; padding: 0 5px; vertical-align: middle; border: 1px solid black; } " +
-                
-                // --- MODIFICACIÓN: Contenedor tabla con alto fijo ---
-                ".contenedor-tabla-fijo { height: 500px; overflow: hidden; position: relative; } " +
-                // ---------------------------------------------------
-                
+                        "<div class='contenedor-tabla'>" +
+                            "<table class='tabla-datos'>" +
+                                "<thead>" +
+                                    "<tr>" +
+                                        "<th class='col-reclamo'>Reclamo</th>" +
+                                        "<th class='col-fecha'>Fecha</th>" +
+                                        "<th class='col-direccion'>Dirección</th>" +
+                                        "<th class='col-solicitud'>Solicitud</th>" +
+                                        "<th>Hora</th>" +
+                                        "<th>Cód</th>" +
+                                        "<th>Obs</th>" +
+                                    "</tr>" +
+                                "</thead>" +
+                                "<tbody>" + filasReclamos + "</tbody>" +
+                            "</table>" +
+                        "</div>" +
+                        "<div class='leyenda-referencias'>" +
+                            "REFERENCIAS DE RESOLUCIÓN: 02 - DIRECCIÓN INEXISTENTE / 04 - NADA EN EL LUGAR / 06 - NO OPERABLE / 08 - NO CORRESPONDE / 10 - CUMPLIDO" +
+                        "</div>" +
+                        htmlMapa + 
+                    "</div>";
+                }
+            const cssEstilos = "body { font-family: sans-serif; margin: 0; padding: 0; } " +
+                ".hoja-reporte { width: 29.7cm; height: 42cm; padding: 0.1cm; box-sizing: border-box; display: flex; flex-direction: column; position: relative; page-break-after: always; } " +
+                ".encabezado-tabla { width: 100%; border: 1px solid black; border-collapse: collapse; margin-bottom: 5px; font-weight: bold; font-size: 14px; color: blue; table-layout: fixed; } " +
+                ".encabezado-tabla td { height: 20px; padding: 0 5px;} " +
+                ".contenedor-tabla { flex-grow: 1; overflow: hidden; margin-bottom: 10px; } " +
                 ".tabla-datos { width: 100%; border: 1px solid black; border-collapse: collapse; table-layout: fixed; } " +
-                ".tabla-datos th, .tabla-datos td { height: 15px; border: 1px solid black; padding: 4px; text-align: left; font-size: 12px; vertical-align: middle; } " +
+                ".tabla-datos th, .tabla-datos td { height: 18px; border: 1px solid black; padding: 4px; text-align: left; font-size: 11px; } " +
                 ".tabla-datos th { background-color: #e0e0e0; } " +
-                ".col-reclamo { width: 9%; } " +
-                ".col-fecha { width: 8%; } " +
-                ".col-direccion { width: 30%; } " +
-                ".col-solicitud { width: 20%; } " +
-                ".col-resolucion { width: 9%; } " +
-                ".col-codigo { width: 9%; } " +
-                ".col-obs { width: 15%; } " +
-                
-                ".etiqueta-mapa { background: #ffffcc; border: 1px solid #ffcc00; font-size: 10px; color: black; padding: 2px; white-space: nowrap; font-weight: bold; } " +
-                
-                // --- MODIFICACIÓN: Posicionamiento absoluto para mapa y leyenda ---
-                ".mapa-interactivo { height: 16cm; width: 100%; position: absolute; bottom: 0; left: 0; border: 1px solid #999; } " +
-                ".leyenda-referencias { position: absolute; bottom: 16cm; left: 0; right: 0; padding: 5px; border: 1px solid black; text-align: center; font-size: 10px; background-color: white; } " +
-                // ------------------------------------------------------------------
-                
+                ".col-reclamo { width: 12%; } .col-fecha { width: 10%; } .col-direccion { width: 28%; } .col-solicitud { width: 15%; } " +
+                ".leyenda-referencias { width: 100%; padding: 5px 0; border: 1px solid black; text-align: center; font-size: 10px; margin-bottom: 2px; } " +
+                ".mapa-interactivo { height: 20cm; width: 100%; border: 1px solid black; } " +
+                ".etiqueta-mapa { background: #ffffcc; border: 1px solid #ffcc00; font-size: 9px; color: black; padding: 1px 3px; font-weight: bold; } " +
                 "@media print { " +
-                    "body { margin: 0; } " +
-                    ".salto-pagina { page-break-before: always; break-before: page; } " +
+                    ".hoja-reporte { margin: 0; border: none; } " +
                     ".mapa-interactivo { -webkit-print-color-adjust: exact; print-color-adjust: exact; } " +
                 "}";
-
             const reporteHTML = "<html>" +
                 "<head>" +
                     "<title>Reporte Servicio " + servicioSeleccionado.Nombre + "</title>" +
@@ -581,27 +465,18 @@
                     "<script>" + mapaScripts + "<\/script>" +
                 "</body>" +
                 "</html>";
-
-            // 4. Abrir ventana e imprimir
-            const ventanaReporte = window.open('', 'ReporteUnico', 'width=1000,height=900');
+            const ventanaReporte = window.open('', 'ReporteUnico', 'width=930,height=900');
             ventanaReporte.document.write(reporteHTML);
             ventanaReporte.document.close();
-            
             ventanaReporte.onload = function() {
-                // --- MODIFICACIÓN: 1 segundo de espera ---
                 setTimeout(function() {
                     ventanaReporte.print();
                 }, 1000);
-                // -----------------------------------------
             };
         }
-
-        // --- Función matemática ---
         function calcularPuntoEnLineaPorDistancia(coords, porcentaje) {
             if (coords.length < 2) return {lat: coords[0][1], lng: coords[0][0]};
-            
             let porcentajeAjustado = 0.2 + (porcentaje * 0.6); 
-
             let distancias = [];
             let distanciaTotal = 0;
             for (let i = 0; i < coords.length - 1; i++) {
@@ -609,10 +484,8 @@
                 distancias.push(d);
                 distanciaTotal += d;
             }
-            
             let distanciaObjetivo = porcentajeAjustado * distanciaTotal;
             let distanciaAcumulada = 0;
-            
             for (let i = 0; i < distancias.length; i++) {
                 if (distanciaAcumulada + distancias[i] >= distanciaObjetivo) {
                     let porcentajeSegmento = (distanciaObjetivo - distanciaAcumulada) / distancias[i];
