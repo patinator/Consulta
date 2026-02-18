@@ -68,7 +68,7 @@
 <body>
     <div id="panel-lateral">
         <h3>Procesar Reclamos</h3>
-        <p style="font-size: 12px; color: #666;">Seleccione un servicio para geocodificar en el mapa:</p>
+        <p id="estado-carga" style="font-size: 12px; color: #666; font-weight: bold;">CARGANDO RECLAMOS...</p>
         <div id="contenedor-botones"></div>
         <div id="contenedor-filtros-reporte" style="margin-top: 15px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; background-color: #f9f9f9;">
             <div style="font-weight: bold; margin-bottom: 5px;">Opciones de reporte:</div>
@@ -112,51 +112,67 @@
             ]
         };
         window.onload = function() {
+            // Inicializar mapa...
             map = L.map('mapa', { renderer: L.canvas() }).setView([-34.6395, -58.3871], 15);
             L.tileLayer('teselas/{z}/{x}/{y}.png', { minZoom: 7, maxZoom: 18 }).addTo(map);
             markersLayer.addTo(map);
-            const idPlanilla = "1sJKDOy6VGya8RNNz7cNLnheuq_x1yqIJ4nvnQMnTvio";
+            
+            // Referencia al párrafo de estado
+            const etiquetaEstado = document.getElementById("estado-carga");
+            etiquetaEstado.innerText = "CARGANDO RECLAMOS...";
+            etiquetaEstado.style.color = "#ffa500"; // Naranja mientras carga
+
+            // Cargar datos vía JSONP
+            const idPlanilla = "1SXsGaisv1DkKzyBF0wOVDmVZXX3djSmSJNTS70MIZdB5O_wK200Uo55t0xN7hxisL-y2cyIWbyF-F0";
             const urlScript = `https://docs.google.com/spreadsheets/d/${idPlanilla}/gviz/tq?tqx=responseHandler:procesarJSONP`;
+            
             const script = document.createElement('script');
             script.src = urlScript;
+            // Manejo de error de red (si no hay internet o link roto)
+            script.onerror = function() {
+                etiquetaEstado.innerText = "PROBLEMA AL CARGAR DATOS";
+                etiquetaEstado.style.color = "red";
+            };
             document.body.appendChild(script);
+
             generarBotonesServicio(); 
         };
+
         function procesarJSONP(datos) {
+            const etiquetaEstado = document.getElementById("estado-carga");
             try {
                 const filas = datos.table.rows;
-                
                 const features = filas.map((fila) => {
-                    const v = fila.c; // Array de celdas (A=0, B=1, C=2...)
+                    const v = fila.c;
+                    const leer = (idx) => (v[idx] && v[idx].v !== null) ? String(v[idx].v).trim() : "";
                     
-                    // Función auxiliar para evitar errores si la celda está vacía
-                    const leer = (idx) => {
-                        if (!v[idx] || v[idx].v === null || v[idx].v === undefined) return "";
-                        return String(v[idx].v).trim();
-                    };
-
-                    const direccion = leer(3); // Columna D (Índice 3)
+                    const direccion = leer(3); 
                     if (!direccion) return null;
 
                     return {
                         "type": "Feature",
                         "properties": {
-                            "FECHA": v[0] ? (v[0].f || v[0].v) : "", // Col A (Índice 0)
-                            "SERVICIO": leer(1),                     // Col B (Índice 1)
-                            "TURNO": leer(2),                        // Col C (Índice 2)
-                            "DIRECCION": direccion,                  // Col D (Índice 3)
-                            "SOLICITUD": leer(4),                    // Col E (Índice 4)
-                            "CODIGO": leer(5),                       // Col F (Índice 5)
+                            "FECHA": v[0] ? (v[0].f || v[0].v) : "",
+                            "SERVICIO": leer(1),
+                            "TURNO": leer(2),
+                            "DIRECCION": direccion,
+                            "SOLICITUD": leer(4),
+                            "CODIGO": leer(5),
                             "AREA_ASIGNADA": "0" 
                         }
                     };
                 }).filter(f => f !== null);
 
                 reclamosData.features = features;
-                console.log("Datos mapeados correctamente. Total:", reclamosData.features.length);
-                
+
+                // ÉXITO: Mostramos el conteo
+                etiquetaEstado.innerText = reclamosData.features.length + " RECLAMOS CARGADOS";
+                etiquetaEstado.style.color = "#28a745"; // Verde éxito
+
             } catch (error) {
                 console.error("Error procesando JSONP:", error);
+                etiquetaEstado.innerText = "PROBLEMA AL CARGAR DATOS";
+                etiquetaEstado.style.color = "red";
             }
         }
         function generarBotonesServicio() {
