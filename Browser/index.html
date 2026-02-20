@@ -127,15 +127,10 @@
         };
         
         window.onload = function() {
-            // 1. Inicializar mapa (tu código de siempre)
             map = L.map('mapa', { renderer: L.canvas() }).setView([-34.6395, -58.3871], 15);
             L.tileLayer('teselas/{z}/{x}/{y}.png', { minZoom: 7, maxZoom: 18 }).addTo(map);
             markersLayer.addTo(map);
-            
-            // 2. Generar botones de servicio
             generarBotonesServicio();
-
-            // 3. Primera carga de datos
             recargarDatos();
         };
         
@@ -143,30 +138,18 @@
         function recargarDatos() {
             const etiquetaEstado = document.getElementById("estado-carga");
             const idPlanilla = "1sJKDOy6VGya8RNNz7cNLnheuq_x1yqIJ4nvnQMnTvio";
-            
-            // --- ESTADO: ACTUALIZANDO (NARANJA) ---
             etiquetaEstado.innerText = "SINCRONIZANDO...";
-            etiquetaEstado.style.color = "#d97706"; // Naranja oscuro para legibilidad
-            etiquetaEstado.style.backgroundColor = "#fef3c7"; // Fondo crema/naranja suave
+            etiquetaEstado.style.color = "#d97706";
+            etiquetaEstado.style.backgroundColor = "#fef3c7";
             etiquetaEstado.style.borderColor = "#f59e0b";
-                    
-            // 1. LIMPIAR SCRIPTS VIEJOS
             const scripts = document.querySelectorAll('.google-script');
             scripts.forEach(s => s.remove());
-
-            // 2. PEDIR LA HORA (Hoja "Control") - gid=ID_DE_TU_HOJA_CONTROL
-            // Normalmente la primera hoja es gid=0, la segunda tiene otro ID. 
-            // Si no sabes el ID, usa el nombre de la hoja:
             const urlHora = `https://docs.google.com/spreadsheets/d/${idPlanilla}/gviz/tq?tqx=responseHandler:procesarHora&sheet=Control&t=${new Date().getTime()}`;
-            
             const scriptHora = document.createElement('script');
             scriptHora.className = 'google-script';
             scriptHora.src = urlHora;
             document.body.appendChild(scriptHora);
-
-            // 3. PEDIR LOS DATOS (Hoja principal)
             const urlDatos = `https://docs.google.com/spreadsheets/d/${idPlanilla}/gviz/tq?tqx=responseHandler:procesarJSONP&sheet=Hoja1&t=${new Date().getTime()}`;
-            
             const scriptDatos = document.createElement('script');
             scriptDatos.className = 'google-script';
             scriptDatos.src = urlDatos;
@@ -176,19 +159,14 @@
         window.procesarHora = function(datos) {
             try {
                 const filas = datos.table.rows;
-
-                // Función interna para formatear el dato de Google
                 const formatearFechaGoogle = (celda) => {
                     if (!celda) return "Sin datos";
-                    // Si Google ya nos da el valor formateado como texto (f), lo usamos
                     if (celda.f) return celda.f;
-                    // Si es un objeto Date de Google, lo convertimos a string legible
                     if (celda.v && celda.v.toString().includes("Date")) {
-                        // Extraemos los números del string "Date(2026,0,21...)"
                         const match = celda.v.match(/\d+/g);
                         if (match) {
                             const d = match[2].padStart(2, '0');
-                            const m = (parseInt(match[1]) + 1).toString().padStart(2, '0'); // Meses en JS son 0-11
+                            const m = (parseInt(match[1]) + 1).toString().padStart(2, '0');
                             const a = match[0];
                             const h = match[3].padStart(2, '0');
                             const min = match[4].padStart(2, '0');
@@ -196,77 +174,59 @@
                             return `${d}/${m}/${a} ${h}:${min}:${seg}`;
                         }
                     }
-                    return celda.v; // Por si ya viene limpio
+                    return celda.v;
                 };
-
                 const edicion = formatearFechaGoogle(filas[0].c[1]);
                 const exportacion = formatearFechaGoogle(filas[1].c[1]);
-
                 document.getElementById("fecha-edicion").innerText = edicion;
                 document.getElementById("fecha-exportacion").innerText = exportacion;
-
             } catch (e) {
                 console.error("Error al formatear fechas:", e);
             }
         };
-        // ESTA ES LA FUNCIÓN QUE TRADUCE LOS DATOS DE GOOGLE
+        
         window.procesarJSONP = function(datos) {
             const etiquetaEstado = document.getElementById("estado-carga");
-            
             try {
-                // Verificamos que Google haya mandado datos válidos
                 if (!datos || !datos.table || !datos.table.rows) {
                     throw new Error("Formato de datos no reconocido");
                 }
-
                 const filas = datos.table.rows;
-                
-                // Mapeamos las filas del Sheets a nuestro formato de reclamos
                 const features = filas.map((fila) => {
-                    const v = fila.c; // 'c' es el array de celdas (A, B, C...)
-                    
-                    // Función para leer celdas sin que el código se rompa si están vacías
+                    const v = fila.c;
                     const leer = (idx) => {
                         if (!v || !v[idx] || v[idx].v === null) return "";
                         return String(v[idx].v).trim();
                     };
-
-                    const direccion = leer(3); // Columna D (Dirección)
-                    if (!direccion) return null; // Si no hay dirección, ignoramos la fila
-
+                    const direccion = leer(3);
+                    if (!direccion) return null;
                     return {
                         "type": "Feature",
                         "properties": {
-                            "FECHA": v[0] ? (v[0].f || v[0].v) : "", // Col A
-                            "SERVICIO": leer(1),                     // Col B
-                            "TURNO": leer(2),                        // Col C
-                            "DIRECCION": direccion,                  // Col D
-                            "SOLICITUD": leer(4),                    // Col E
-                            "CODIGO": leer(5),                       // Col F
+                            "FECHA": v[0] ? (v[0].f || v[0].v) : "", 
+                            "SERVICIO": leer(1),                     
+                            "TURNO": leer(2),                        
+                            "DIRECCION": direccion,                  
+                            "SOLICITUD": leer(4),                    
+                            "CODIGO": leer(5),                       
                             "AREA_ASIGNADA": "0" 
                         }
                     };
-                }).filter(f => f !== null); // Filtramos las filas vacías
-
-                // Guardamos los reclamos en nuestra variable global
+                }).filter(f => f !== null);
                 reclamosData.features = features;
-
-                // Actualizamos el botón con el conteo final
                 if (etiquetaEstado) {
                     etiquetaEstado.innerText = reclamosData.features.length + " RECLAMOS CARGADOS (ACTUALIZAR)";
-                    etiquetaEstado.style.color = "#15803d"; // Verde oscuro
-                    etiquetaEstado.style.backgroundColor = "#dcfce7"; // Verde muy claro
+                    etiquetaEstado.style.color = "#15803d";
+                    etiquetaEstado.style.backgroundColor = "#dcfce7";
                     etiquetaEstado.style.borderColor = "#22c55e";
                 }
-                
                 console.log("Datos cargados: " + reclamosData.features.length);
-
             } catch (error) {
                 console.error("Error en procesarJSONP:", error);
                 if (etiquetaEstado) {
                     etiquetaEstado.innerText = "PROBLEMA AL CARGAR DATOS";
-                    etiquetaEstado.style.color = "#b91c1c"; // Rojo oscuro
-                    etiquetaEstado.style.backgroundColor = "#fee2e2"; // Rojo muy claro
+                    etiquetaEstado.style.color = "#b91c1c";
+                    etiquetaEstado.style.backgroundColor = "#fee2e2";
                     etiquetaEstado.style.borderColor = "#ef4444";
                 }
             }
@@ -294,6 +254,7 @@
                 contenedorPrincipal.appendChild(grupoDiv);
             }
         }
+        
         function iniciarGeocodificacionPorServicio(servicioSeleccionado) {
             if (typeof callesData === 'undefined' || typeof reclamosData === 'undefined' || typeof rutasData === 'undefined') {
                 alert("Error: Faltan cargar los archivos de datos (CALLES, RECLAMOS o RUTAS).");
@@ -367,232 +328,317 @@
             });
             console.log(`--- Proceso finalizado. Ubicados: ${encontrados}, Fallidos: ${fallidos} ---`);
         }
+        
         function generarReportePorServicio(servicioSeleccionado) {
             if (typeof reclamosData === 'undefined' || typeof rutasData === 'undefined' || typeof callesData === 'undefined') {
-                alert("Error: Faltan cargar los archivos de datos (CALLES, RECLAMOS o RUTAS).");
+                alert("Error: Faltan cargar los archivos de datos.");
                 return;
             }
+
             const incluirMapa = document.getElementById('chkIncluirMapa').checked;
             const incluirSinRutas = document.getElementById('chkSinRutas').checked;
             const incluirRutasVacias = document.getElementById('chkRutasVacias').checked;
-            const normalizar = (texto) => {
-                if(!texto) return "";
-                return texto.toString().trim().toUpperCase();
-            };
+            const normalizar = (t) => t ? t.toString().trim().toUpperCase() : "";
+
             const rutasAgrupadas = {};
             const geoJSONPorRuta = {};
+
+            // --- 1. PROCESAMIENTO DE DATOS ---
             reclamosData.features.forEach(reclamo => {
                 const p = reclamo.properties;
                 if (p.TURNO !== servicioSeleccionado.TURNO || p.SERVICIO !== servicioSeleccionado.SERVICIO) return;
+                
                 const direccionCompleta = p.DIRECCION;
-                if (!direccionCompleta) return;
-                const partes = direccionCompleta.match(/(.*)\s(\d+)$/);
-                if (!partes) return;
-                const calleBuscada = normalizar(partes[1]);
-                const numeroBuscado = parseInt(partes[2]);
-                const segmentoCalle = callesData.features.find(f => {
-                    if (!f.properties.Street) return false;
-                    const calleEnCalle = normalizar(f.properties.Street);
-                    if (calleEnCalle !== calleBuscada) return false;
-                    const pCalle = f.properties;
-                    return (numeroBuscado >= pCalle.Fromleft && numeroBuscado <= pCalle.Toleft) || 
-                           (numeroBuscado >= pCalle.Fromright && numeroBuscado <= pCalle.Toright);
-                });
+                const partes = direccionCompleta ? direccionCompleta.match(/(.*)\s(\d+)$/) : null;
                 let rutaEncontrada = "Sin Ruta";
                 let latlng = null;
-                if (segmentoCalle) {
-                    const pCalle = segmentoCalle.properties;
-                    let idSegmento = String(pCalle.Id);
-                    let claveCampo = servicioSeleccionado.CLAVE;
-                    let featureRuta = rutasData.features.find(f => String(f.properties.Id) === idSegmento);
-                    if (featureRuta) {
-                        rutaEncontrada = featureRuta.properties[claveCampo] || "Sin Ruta";
+
+                if (partes) {
+                    const calleBuscada = normalizar(partes[1]);
+                    const numeroBuscado = parseInt(partes[2]);
+                    const segmento = callesData.features.find(f => {
+                        if (!f.properties.Street) return false;
+                        return normalizar(f.properties.Street) === calleBuscada &&
+                            ((numeroBuscado >= f.properties.Fromleft && numeroBuscado <= f.properties.Toleft) || 
+                                (numeroBuscado >= f.properties.Fromright && numeroBuscado <= f.properties.Toright));
+                    });
+
+                    if (segmento) {
+                        let idSegmento = String(segmento.properties.Id);
+                        let featureRuta = rutasData.features.find(f => String(f.properties.Id) === idSegmento);
+                        if (featureRuta) rutaEncontrada = featureRuta.properties[servicioSeleccionado.CLAVE] || "Sin Ruta";
+                        
+                        const coords = segmento.geometry.coordinates[0];
+                        latlng = calcularPuntoEnLineaPorDistancia(coords, 0.5);
                     }
-                    let desde = Math.min(pCalle.Fromleft, pCalle.Fromright);
-                    let hasta = Math.max(pCalle.Toleft, pCalle.Toright);
-                    let porcentaje = (hasta - desde !== 0) ? (numeroBuscado - desde) / (hasta - desde) : 0.5;
-                    porcentaje = Math.max(0, Math.min(1, porcentaje));
-                    const coords = segmentoCalle.geometry.coordinates[0];
-                    latlng = calcularPuntoEnLineaPorDistancia(coords, porcentaje);
                 }
+
                 if (rutaEncontrada === "" || rutaEncontrada === "0") rutaEncontrada = "Sin Ruta";
                 if (rutaEncontrada === "Sin Ruta" && !incluirSinRutas) return;
+
                 if (!rutasAgrupadas[rutaEncontrada]) {
                     rutasAgrupadas[rutaEncontrada] = [];
                     geoJSONPorRuta[rutaEncontrada] = [];
                 }
                 rutasAgrupadas[rutaEncontrada].push(p);
-                if (latlng) {
-                    geoJSONPorRuta[rutaEncontrada].push({
-                        type: "Feature",
-                        geometry: { type: "Point", coordinates: [latlng.lng, latlng.lat] },
-                        properties: { direccion: p.DIRECCION, codigo: p.CODIGO }
-                    });
-                }
+                if (latlng) geoJSONPorRuta[rutaEncontrada].push({
+                    type: "Feature", geometry: { type: "Point", coordinates: [latlng.lng, latlng.lat] },
+                    properties: { direccion: p.DIRECCION }
+                });
             });
+
             if (incluirRutasVacias) {
                 rutasData.features.forEach(f => {
-                    let nombreRuta = f.properties[servicioSeleccionado.CLAVE];
-                    if (nombreRuta && nombreRuta !== "" && nombreRuta !== "0") {
-                        if (!rutasAgrupadas[nombreRuta]) {
-                            rutasAgrupadas[nombreRuta] = [];
-                            geoJSONPorRuta[nombreRuta] = [];
-                        }
+                    let nombre = f.properties[servicioSeleccionado.CLAVE];
+                    if (nombre && nombre !== "0" && !rutasAgrupadas[nombre]) {
+                        rutasAgrupadas[nombre] = []; geoJSONPorRuta[nombre] = [];
                     }
                 });
             }
+
+            // --- 2. CONSTRUCCIÓN DEL HTML ---
             let contenidoReportes = "";
             let mapaScripts = "";
-            let esPrimeraRuta = true;
+
             for (const ruta in rutasAgrupadas) {
-                let htmlMapa = "";
-                if (incluirMapa) {
-                    let mapaId = "mapa_" + ruta.replace(/[^a-zA-Z0-9]/g, "_");
-                    htmlMapa = '<div id="' + mapaId + '" class="mapa-interactivo"></div>';
-                    mapaScripts += "var " + mapaId + " = L.map('" + mapaId + "', { " +
-                        "renderer: L.canvas()," +
-                        "zoomControl: false," +
-                        "attributionControl: false," +
-                        "dragging: false," +
-                        "touchZoom: false," +
-                        "scrollWheelZoom: false," +
-                        "doubleClickZoom: false," +
-                        "boxZoom: false," +
-                        "keyboard: false," +
-                        "tap: false" +
-                    "}).setView([-34.6395, -58.3871], 14);" +
-                    "L.tileLayer('teselas/{z}/{x}/{y}.png').addTo(" + mapaId + ");" +
-                    "var points = " + JSON.stringify(geoJSONPorRuta[ruta] || []) + ";" +
-                    "if (points.length > 0) {" +
-                        "var geoJsonLayer = L.geoJSON(points, {" +
-                            "pointToLayer: function (feature, latlng) {" +
-                                "return L.circleMarker(latlng, {" +
-                                    "radius: 5," +
-                                    "fillColor: 'red'," +
-                                    "color: 'black'," +
-                                    "weight: 1," +
-                                    "opacity: 1," +
-                                    "fillOpacity: 0.8" +
-                                "});" +
-                            "}," +
-                            "onEachFeature: function (feature, layer) {" +
-                                "layer.bindTooltip(feature.properties.direccion, {" +
-                                    "permanent: true," +
-                                    "direction: 'top'," +
-                                    "className: 'etiqueta-mapa'" +
-                                "});" +
-                            "}" +
-                        "}).addTo(" + mapaId + ");" +
-                        mapaId + ".fitBounds(geoJsonLayer.getBounds().pad(0.1));" +
-                    "}" +
-                    "else {" +
-                        mapaId + ".setView([-34.6395, -58.3871], 15);" +
-                    "}";
+                const reclamosRuta = rutasAgrupadas[ruta];
+                const totalGeneral = reclamosRuta.length;
+                let numHoja = 1;
+                let totalHojas = 1;
+
+            if (incluirMapa) {
+                        if (totalGeneral <= 27) {
+                            totalHojas = 1;
+                        } else {
+                            const resto = totalGeneral % 69;
+                            // Si sobran más de 27 después de las hojas de 69, se necesita una hoja extra de mapa gigante
+                            totalHojas = Math.floor(totalGeneral / 69) + (resto > 27 || resto === 0 ? 2 : 1);
+                        }
+                    } else {
+                        totalHojas = Math.ceil(totalGeneral / 26) || 1;
+                    }
+
+                    let offset = 0;
+                    const nombreLimpioRuta = ruta.replace(/[^a-zA-Z0-9]/g, "_");
+
+                    if (incluirMapa) {
+                        if (totalGeneral <= 27) {
+                            contenidoReportes += generarHojaHTML(ruta, reclamosRuta, true, servicioSeleccionado, "A3", false, 1, 1, totalGeneral);
+                            mapaScripts += crearScriptMapa(`mapa_${nombreLimpioRuta}_h1`, geoJSONPorRuta[ruta]);
+                        } else {
+                            while (offset < totalGeneral) {
+                                let restantes = totalGeneral - offset;
+                                if (restantes > 27) {
+                                    contenidoReportes += generarHojaHTML(ruta, reclamosRuta.slice(offset, offset + 69), false, servicioSeleccionado, "A3", false, numHoja, totalHojas, totalGeneral);
+                                    offset += 69;
+                                    numHoja++;
+                                } else {
+                                    // Última hoja con datos y mapa
+                                    contenidoReportes += generarHojaHTML(ruta, reclamosRuta.slice(offset), true, servicioSeleccionado, "A3", false, numHoja, totalHojas, totalGeneral);
+                                    mapaScripts += crearScriptMapa(`mapa_${nombreLimpioRuta}_h${numHoja}`, geoJSONPorRuta[ruta]);
+                                    offset = totalGeneral;
+                                    numHoja++;
+                                }
+                            }
+                            // Hoja extra de mapa gigante si el excedente fue mucho
+                            if (totalGeneral % 69 > 27 || totalGeneral % 69 === 0) {
+                                contenidoReportes += generarHojaHTML(ruta, [], true, servicioSeleccionado, "A3", true, numHoja, totalHojas, totalGeneral);
+                                mapaScripts += crearScriptMapa(`mapa_${nombreLimpioRuta}_h${numHoja}`, geoJSONPorRuta[ruta]);
+                            }
+                        }
+                    } else {
+                    // --- Lógica A4 Horizontal ---
+                    if (totalGeneral === 0) {
+                        contenidoReportes += generarHojaHTML(ruta, [], false, servicioSeleccionado, "A4", false, 1, 1, 0);
+                    } else {
+                        while (offset < totalGeneral) {
+                            contenidoReportes += generarHojaHTML(ruta, reclamosRuta.slice(offset, offset + 26), false, servicioSeleccionado, "A4", false, numHoja, totalHojas, totalGeneral);
+                            offset += 26;
+                            numHoja++;
+                        }
+                    }
                 }
-                let turno = servicioSeleccionado.TURNO;
-                let saltoDePaginaClass = esPrimeraRuta ? "" : "salto-pagina";
-                esPrimeraRuta = false;
-                let filasReclamos = "";
-                if (rutasAgrupadas[ruta].length > 0) {
-                    rutasAgrupadas[ruta].forEach(p => {
-                        filasReclamos += "<tr>" +
-                            "<td class='col-reclamo'>" + p.CODIGO + "</td>" +
-                            "<td class='col-fecha'>" + (p.FECHA || '') + "</td>" +
-                            "<td class='col-direccion'>" + p.DIRECCION + "</td>" +
-                            "<td class='col-solicitud'>" + (p.SOLICITUD || '') + "</td>" +
-                            "<td class='col-resolucion'></td>" +
-                            "<td class='col-codigo'></td>" +
-                            "<td class='col-obs'></td>" +
-                        "</tr>";
-                    });
-                } else {
-                    filasReclamos = "<tr><td colspan='7' style='text-align:center;'>Sin reclamos en esta ruta</td></tr>";
-                }
-                contenidoReportes += "<div class='hoja-reporte'>" +
-                        "<table class='encabezado-tabla'>" +
-                            "<tr>" +
-                                "<td style='width: 15%'>Servicio:</td>" +
-                                "<td style='width: 45%'>" + servicioSeleccionado.Nombre + "</td>" +
-                                "<td style='text-align: right; width: 40%; color: black' colspan='2'; >PRTIN - 3701 - URBASUR - D01 Vr.2</td>" +
-                            "</tr>" +
-                            "<tr>" +
-                                "<td>Ruta:</td>" +
-                                "<td>" + ruta + "</td>" +
-                                "<td>FECHA:</td>" +
-                                "<td>" + new Date().toLocaleDateString() + "</td>" +
-                            "</tr>" +
-                            "<tr>" +
-                                "<td>Turno:</td>" +
-                                "<td>" + (servicioSeleccionado.TURNO || '') + "</td>" +
-                                "<td>SUPERVISOR:</td>" +
-                                "<td>__________________</td>" +
-                            "</tr>" +
-                            "<tr>" +
-                                "<td>Rec. / Sol. :</td>" +
-                                "<td>" + (rutasAgrupadas[ruta].length || '') + "</td>" +
-                                "<td>FIRMA:</td>" +
-                                "<td>__________________</td>" +
-                            "</tr>" +
-                        "</table>" +
-                        "<div class='contenedor-tabla'>" +
-                            "<table class='tabla-datos'>" +
-                                "<thead>" +
-                                    "<tr>" +
-                                        "<th class='col-reclamo'>Reclamo</th>" +
-                                        "<th class='col-fecha'>Fecha</th>" +
-                                        "<th class='col-direccion'>Dirección</th>" +
-                                        "<th class='col-solicitud'>Solicitud</th>" +
-                                        "<th class='col-hora'>Hora</th>" +
-                                        "<th class='col-cod'>Cód</th>" +
-                                        "<th class='col-obs'>Obs</th>" +
-                                    "</tr>" +
-                                "</thead>" +
-                                "<tbody>" + filasReclamos + "</tbody>" +
-                            "</table>" +
-                        "</div>" +
-                        "<div class='leyenda-referencias'>" +
-                            "REFERENCIAS DE RESOLUCIÓN: 02 - DIRECCIÓN INEXISTENTE / 04 - NADA EN EL LUGAR / 06 - NO OPERABLE / 08 - NO CORRESPONDE / 10 - CUMPLIDO" +
-                        "</div>" +
-                        htmlMapa + 
-                    "</div>";
-                }
-            const cssEstilos = "body { font-family: sans-serif; margin: 0; padding: 0; } " +
-                ".hoja-reporte { width: 29.7cm; height: 42cm; padding: 0.1cm; box-sizing: border-box; display: flex; flex-direction: column; position: relative; page-break-after: always; } " +
-                ".encabezado-tabla { width: 100%; border: 1px solid black; border-collapse: collapse; margin-bottom: 5px; font-weight: bold; font-size: 14px; color: blue; table-layout: fixed; } " +
-                ".encabezado-tabla td { height: 22px; padding: 0 5px;} " +
-                ".contenedor-tabla { flex-grow: 1; overflow: hidden; margin-bottom: 10px; } " +
-                ".tabla-datos { width: 100%; border: 1px solid black; border-collapse: collapse; table-layout: fixed; } " +
-                ".tabla-datos th, .tabla-datos td { height: 18px; border: 1px solid black; padding: 4px; text-align: left; font-size: 11px; } " +
-                ".tabla-datos th { background-color: #e0e0e0; } " +
-                ".col-reclamo { width: 6%; } .col-fecha { width: 6%; } .col-direccion { width: 30%; } .col-solicitud { width: 25%; } .col-hora { width: 5%; } .col-cod { width: 5%; } .col-obs { width: 23%; } " +
-                ".leyenda-referencias { width: 100%; padding: 5px 0; border: 1px solid black; text-align: center; font-size: 10px; margin-bottom: 2px; } " +
-                ".mapa-interactivo { height: 20cm; width: 100%; border: 1px solid black; } " +
-                ".etiqueta-mapa { background: #ffffcc; border: 1px solid #ffcc00; font-size: 9px; color: black; padding: 1px 3px; font-weight: bold; } " +
-                "@media print { " +
-                    ".hoja-reporte { margin: 0; border: none; } " +
-                    ".mapa-interactivo { -webkit-print-color-adjust: exact; print-color-adjust: exact; } " +
-                "}";
-            const reporteHTML = "<html>" +
-                "<head>" +
-                    "<title>Reporte Servicio " + servicioSeleccionado.Nombre + "</title>" +
-                    "<link rel='stylesheet' href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css' />" +
-                    "<style>" + cssEstilos + "</style>" +
-                    "<script src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'><\/script>" +
-                "</head>" +
-                "<body>" +
-                    contenidoReportes +
-                    "<script>" + mapaScripts + "<\/script>" +
-                "</body>" +
-                "</html>";
-            const ventanaReporte = window.open('', 'ReporteUnico', 'width=930,height=900');
-            ventanaReporte.document.write(reporteHTML);
-            ventanaReporte.document.close();
-            ventanaReporte.onload = function() {
-                setTimeout(function() {
-                    ventanaReporte.print();
-                }, 1000);
-            };
+            }
+
+            // Función auxiliar para generar el JS de cada mapa
+            function crearScriptMapa(id, puntos) {
+                return `
+                    (function(){
+                        var m = L.map('${id}', {zoomControl:false, attributionControl:false, dragging:false, scrollWheelZoom:false}).setView([-34.6395, -58.3871], 14);
+                        L.tileLayer('teselas/{z}/{x}/{y}.png').addTo(m);
+                        var pts = ${JSON.stringify(puntos)};
+                        if(pts.length > 0){
+                            var lyr = L.geoJSON(pts, {
+                                pointToLayer: (f, l) => L.circleMarker(l, {radius:6, fillColor:'red', color:'black', weight:1, fillOpacity:0.8}),
+                                onEachFeature: (f, layer) => layer.bindTooltip(f.properties.direccion, {permanent:true, direction:'top', className:'etiqueta-mapa'})
+                            }).addTo(m);
+                            m.fitBounds(lyr.getBounds().pad(0.2));
+                        }
+                    })();`;
+            }
+
+            abrirVentanaReporte(contenidoReportes, mapaScripts, incluirMapa);
         }
+
+        function generarHojaHTML(ruta, datos, conMapa, serv, tipoPapel, mapaGigante, hojaActual, totalHojas, totalGeneral) {
+            let filas = datos.map(p => `
+                <tr>
+                    <td class="col-reclamo">${p.CODIGO}</td>
+                    <td class="col-fecha">${p.FECHA || ''}</td>
+                    <td class="col-direccion">${p.DIRECCION}</td>
+                    <td class="col-solicitud">${p.SOLICITUD || ''}</td>
+                    <td class="col-resolucion"></td><td class="col-codigo"></td><td class="col-obs"></td>
+                </tr>`).join('');
+
+            if (datos.length === 0 && !mapaGigante) {
+                filas = "<tr><td colspan='7' style='text-align:center;'>Sin reclamos en esta ruta</td></tr>";
+            }
+
+            const mapaId = `mapa_${ruta.replace(/[^a-zA-Z0-9]/g, "_")}_h${hojaActual}`;
+            const mapaDiv = conMapa ? `<div id="${mapaId}" class="${mapaGigante ? 'mapa-gigante' : 'mapa-normal'}"></div>` : "";
+            
+            // Si hay más de una hoja, muestra la numeración, de lo contrario solo el conteo
+            const textoConteo = `${totalGeneral}${totalHojas > 1 ? ` (Hoja ${hojaActual} de ${totalHojas})` : ''}`;
+
+            return `
+            <div class="hoja-reporte ${tipoPapel}">
+                <table class="encabezado-tabla">
+                    <tr>
+                        <td style="width: 15%">Servicio:</td>
+                        <td style="width: 60%">${serv.Nombre}</td>
+                        <td style="text-align: right; width: 25%; color: black" colspan="2">PRTIN - 3701 - URBASUR - D01 Vr.2</td>
+                    </tr>
+                    <tr>
+                        <td>Ruta:</td>
+                        <td>${ruta}</td>
+                        <td style="width: 10%">FECHA:</td>
+                        <td>${new Date().toLocaleDateString()}</td>
+                    </tr>
+                    <tr>
+                        <td>Turno:</td>
+                        <td>${serv.TURNO || ''}</td>
+                        <td>SUPERVISOR:</td>
+                        <td>__________________</td>
+                    </tr>
+                    <tr>
+                        <td>Rec. / Sol. :</td>
+                        <td>${textoConteo}</td>
+                        <td>FIRMA:</td>
+                        <td>__________________</td>
+                    </tr>
+                </table>
+
+                ${!mapaGigante ? `
+                <div class="contenedor-tabla">
+                    <table class="tabla-datos">
+                        <thead>
+                            <tr>
+                                <th class="col-reclamo">Reclamo</th>
+                                <th class="col-fecha">Fecha</th>
+                                <th class="col-direccion">Dirección</th>
+                                <th class="col-solicitud">Solicitud</th>
+                                <th class="col-hora">Hora</th>
+                                <th class="col-cod">Cód</th>
+                                <th class="col-obs">Obs</th>
+                            </tr>
+                        </thead>
+                        <tbody>${filas}</tbody>
+                    </table>
+                </div>` : ""}
+
+                <div class="espaciador-flexible"></div>
+
+                <div class="leyenda-referencias">
+                    REFERENCIAS DE RESOLUCIÓN: 02 - DIRECCIÓN INEXISTENTE / 04 - NADA EN EL LUGAR / 06 - NO OPERABLE / 08 - NO CORRESPONDE / 10 - CUMPLIDO
+                </div>
+                
+                ${mapaDiv}
+            </div>`;
+        }
+        
+        function abrirVentanaReporte(html, scripts, conMapa) {
+            // Definir dimensiones fijas
+            const ancho = 1100;
+            const alto = 900;
+            
+            // El parámetro popup=yes y las dimensiones fijas fuerzan la apertura en ventana nueva
+            const win = window.open('', '_blank', `width=${ancho},height=${alto},resizable=no,scrollbars=yes,status=no,location=no,toolbar=no,menubar=no,popup=yes`);
+            
+            const estiloPapel = conMapa ? 
+                `@page { size: A3 portrait; margin: 0; } .hoja-reporte { width: 29.7cm; height: 41.5cm; }` : 
+                `@page { size: A4 landscape; margin: 0; } .hoja-reporte { width: 29.7cm; height: 20.5cm; }`;
+
+            win.document.write(`
+                <html>
+                <head>
+                    <title>Reporte de Reclamos</title>
+                    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+                    <style>
+                        body { margin: 0; padding: 0; font-family: sans-serif; background-color: #525659; }
+                        ${estiloPapel}
+                        
+                        .hoja-reporte { 
+                            padding: 0.8cm; 
+                            box-sizing: border-box; 
+                            background-color: white; 
+                            display: flex; 
+                            flex-direction: column; 
+                            page-break-after: always; 
+                            margin: 10px auto; 
+                        }
+
+                        .encabezado-tabla { 
+                            width: 100%; 
+                            border: 1px solid black; 
+                            border-collapse: collapse; 
+                            margin-bottom: 10px; 
+                            font-weight: bold; 
+                            font-size: 14px; 
+                            color: blue; 
+                        }
+                        .encabezado-tabla td { border: none; padding: 2px 5px; height: 22px; }
+
+                        .tabla-datos { width: 100%; border-collapse: collapse; font-size: 11px; table-layout: fixed; }
+                        .tabla-datos th, .tabla-datos td { border: 1px solid black; padding: 4px; text-align: left; }
+                        .tabla-datos th { background-color: #e0e0e0; }
+
+                        .col-reclamo { width: 6%; } .col-fecha { width: 8%; } .col-direccion { width: 30%; } 
+                        .col-solicitud { width: 25%; } .col-hora { width: 5%; } .col-cod { width: 5%; } .col-obs { width: 21%; }
+
+                        .espaciador-flexible { flex-grow: 1; }
+
+                        .leyenda-referencias { 
+                            width: 100%; 
+                            padding: 5px 0; 
+                            border: 1px solid black; 
+                            text-align: center; 
+                            font-size: 10px; 
+                            margin-bottom: 5px;
+                        }
+
+                        .mapa-normal { height: 20cm; width: 100%; border: 1px solid black; }
+                        .mapa-gigante { height: 30cm; width: 100%; border: 1px solid black; }
+
+                        .etiqueta-mapa { background: #ffffcc; border: 1px solid #000; font-size: 8px; color: black; padding: 1px 3px; font-weight: bold; }
+
+                        @media print {
+                            body { background: none; }
+                            .hoja-reporte { margin: 0; border: none; }
+                        }
+                    </style>
+                    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
+                </head>
+                <body>
+                    ${html}
+                    <script>
+                        ${scripts} 
+                        window.onload = () => { setTimeout(() => { window.print(); }, 1500); };
+                    <\/script>
+                </body>
+                </html>`);
+            win.document.close();
+        }
+
         function calcularPuntoEnLineaPorDistancia(coords, porcentaje) {
             if (coords.length < 2) return {lat: coords[0][1], lng: coords[0][0]};
             let porcentajeAjustado = 0.2 + (porcentaje * 0.6); 
