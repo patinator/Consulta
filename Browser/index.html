@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Geocodificador de Reclamos</title>
+    <link rel="icon" href="img/ito.png" type="image/png">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; padding: 0; display: flex; height: 100vh; overflow: hidden; font-family: sans-serif; }
@@ -31,7 +32,7 @@
             gap: 8px; 
             overflow-y: auto;
         }
-        #mapa { flex-grow: 1; background-color: #fff; }
+        #mapa { flex-grow: 1; background: #fff; }
         h3 { margin: 0 0 5px 0; color: #333; font-size: 18px; }
         .filtro-grupo { margin-bottom: 10px; } 
         .filtro-titulo { font-weight: bold; margin-bottom: 5px; color: #555; display: block; border-bottom: 1px solid #ccc; padding-bottom: 3px; font-size: 14px; }
@@ -260,23 +261,37 @@
                 alert("Error: Faltan cargar los archivos de datos (CALLES, RECLAMOS o RUTAS).");
                 return;
             }
+            
             markersLayer.clearLayers();
-            const normalizar = (texto) => {
-                if(!texto) return "";
-                return texto.toString().trim().toUpperCase();
-            };
+            const normalizar = (texto) => texto ? texto.toString().trim().toUpperCase() : "";
+
             console.log(`--- Iniciando geocodificación para: ${servicioSeleccionado.CLAVE} ---`);
+            
             let encontrados = 0;
             let fallidos = 0;
+            let erroresDetalle = []; // Para almacenar los fallos
+
             reclamosData.features.forEach((reclamo) => {
                 const p = reclamo.properties;
                 if (p.TURNO !== servicioSeleccionado.TURNO || p.SERVICIO !== servicioSeleccionado.SERVICIO) return;
+                
                 const direccionCompleta = p.DIRECCION;
-                if (!direccionCompleta) return;
+                if (!direccionCompleta) {
+                    erroresDetalle.push({ CODIGO: p.CODIGO, DIRECCION: "N/A", MOTIVO: "Dirección vacía" });
+                    fallidos++;
+                    return;
+                }
+
                 const partes = direccionCompleta.match(/(.*)\s(\d+)$/);
-                if (!partes) return;
+                if (!partes) {
+                    erroresDetalle.push({ CODIGO: p.CODIGO, DIRECCION: direccionCompleta, MOTIVO: "Formato inválido (falta altura o nombre)" });
+                    fallidos++;
+                    return;
+                }
+
                 const calleBuscada = normalizar(partes[1]);
                 const numeroBuscado = parseInt(partes[2]);
+
                 const segmentoCalle = callesData.features.find(f => {
                     if (!f.properties.Street) return false;
                     const calleEnCalle = normalizar(f.properties.Street);
@@ -285,48 +300,57 @@
                     return (numeroBuscado >= pCalle.Fromleft && numeroBuscado <= pCalle.Toleft) || 
                         (numeroBuscado >= pCalle.Fromright && numeroBuscado <= pCalle.Toright);
                 });
+
                 if (segmentoCalle) {
                     const pCalle = segmentoCalle.properties;
                     let desde = Math.min(pCalle.Fromleft, pCalle.Fromright);
                     let hasta = Math.max(pCalle.Toleft, pCalle.Toright);
                     let porcentaje = (hasta - desde !== 0) ? (numeroBuscado - desde) / (hasta - desde) : 0.5;
                     porcentaje = Math.max(0, Math.min(1, porcentaje));
+                    
                     const coords = segmentoCalle.geometry.coordinates[0];
                     const latlng = calcularPuntoEnLineaPorDistancia(coords, porcentaje);
+                    
                     let areaEncontrada = "0";
                     let idSegmento = String(pCalle.Id); 
-                    let claveCampo = servicioSeleccionado.CLAVE;
                     let featureRuta = rutasData.features.find(f => String(f.properties.Id) === idSegmento);
+                    
                     if (featureRuta) {
-                        areaEncontrada = featureRuta.properties[claveCampo];
-                        if (areaEncontrada === null || areaEncontrada === undefined || areaEncontrada === "") {
-                            areaEncontrada = "0";
-                        }
+                        areaEncontrada = featureRuta.properties[servicioSeleccionado.CLAVE] || "0";
                     }
+                    
                     p.AREA_ASIGNADA = areaEncontrada;
+
+                    // Marcador en el mapa
                     L.circleMarker(latlng, {
-                        radius: 7,
-                        fillColor: "#ff0000",
-                        color: "#000",
-                        weight: 1,
-                        opacity: 1,
-                        fillOpacity: 0.8
-                    })
-                    .addTo(markersLayer)
-                    .bindPopup(`<b>${p.CODIGO}</b><br>${direccionCompleta}<br>ID: ${idSegmento}<br>Ruta: ${p.AREA_ASIGNADA}`);
+                        radius: 7, fillColor: "#ff0000", color: "#000", weight: 1, opacity: 1, fillOpacity: 0.8
+                    }).addTo(markersLayer).bindPopup(`<b>${p.CODIGO}</b><br>${direccionCompleta}<br>ID: ${idSegmento}<br>Ruta: ${p.AREA_ASIGNADA}`);
+
                     let labelIcon = L.divIcon({
-                        className: 'direccion-label',
-                        html: direccionCompleta,
-                        iconSize: null, 
-                        iconAnchor: [50, 30]
+                        className: 'direccion-label', html: direccionCompleta, iconSize: null, iconAnchor: [50, 30]
                     });
                     L.marker(latlng, { icon: labelIcon }).addTo(markersLayer);
+                    
                     encontrados++;
                 } else {
+                    // REGISTRO DE FALLO: No se encontró la calle o la altura
+                    erroresDetalle.push({ 
+                        CODIGO: p.CODIGO, 
+                        DIRECCION: direccionCompleta, 
+                        MOTIVO: "Calle no encontrada o altura fuera de rango" 
+                    });
                     fallidos++;
                 }
             });
+
+            // --- REPORTE FINAL POR CONSOLA ---
             console.log(`--- Proceso finalizado. Ubicados: ${encontrados}, Fallidos: ${fallidos} ---`);
+            
+            if (erroresDetalle.length > 0) {
+                console.group("Detalle de Reclamos NO Geocodificados");
+                console.table(erroresDetalle); // Crea una tabla interactiva en la consola
+                console.groupEnd();
+            }
         }
         
         function generarReportePorServicio(servicioSeleccionado) {
