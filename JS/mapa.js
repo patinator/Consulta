@@ -732,4 +732,5 @@ function generarInforme() {
 }
 // Iniciar Combos al cargar
 
+
 initCombos();
