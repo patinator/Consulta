@@ -3,7 +3,7 @@ let capR = L.layerGroup(), capE = L.layerGroup(), capC = L.layerGroup();
 
 const mapasBase = {
     'URBASUR': L.tileLayer('Browser/teselas/{z}/{x}/{y}.png', {
-        attribution: '&copy; URBA'
+        attribution: '&copy; URBA',
         minZoom: 3,
         maxZoom: 19,
     }),
