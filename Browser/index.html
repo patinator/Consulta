@@ -129,7 +129,7 @@
         
         window.onload = function() {
             map = L.map('mapa', { renderer: L.canvas() }).setView([-34.6395, -58.3871], 15);
-            L.tileLayer('teselas/{z}/{x}/{y}.png', { minZoom: 7, maxZoom: 18 }).addTo(map);
+            L.tileLayer('teselas/{z}/{x}/{y}.png', { minZoom: 7, maxZoom: 19 }).addTo(map);
             markersLayer.addTo(map);
             generarBotonesServicio();
             recargarDatos();
