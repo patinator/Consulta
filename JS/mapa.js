@@ -3,9 +3,7 @@ let capR = L.layerGroup(), capE = L.layerGroup(), capC = L.layerGroup();
 
 const mapasBase = {
     'URBASUR': L.tileLayer('Browser/teselas/{z}/{x}/{y}.png', {
-        attribution: '&copy; URBA',
-        minZoom: 3,
-        maxZoom: 19,
+        attribution: '&copy; URBA'
     }),
     'carto_light': L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; CARTO'
@@ -16,6 +14,8 @@ const mapasBase = {
     // REEMPLAZO DE GCBA: Mapa Oficial del Instituto Geográfico Nacional (IGN)
     'ign': L.tileLayer('https://wms.ign.gob.ar/geoserver/gwc/service/tms/1.0.0/capabaseargenmap@EPSG%3A3857@png/{z}/{x}/{-y}.png', {
         attribution: '&copy; Instituto Geográfico Nacional',
+        minZoom: 3,
+        maxZoom: 18
     }),
     // GOOGLE STREETS (Solo dibujo/callejero)
    'google_streets': L.tileLayer('https://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}', {
@@ -139,7 +139,7 @@ try {
 } catch(e) { console.error("Error cargando base de datos:", e); }
 
 // 2. Inicializar Mapa
-const map = L.map('map').setView([-34.63, -58.36], 13);
+const map = L.map('map').setView([-34.63, -58.36], 15);
 // Variable para rastrear la capa actual
 let capaBaseActual = mapasBase['URBASUR'];
 
@@ -272,7 +272,7 @@ function dibujar(ids) {
             // IMPORTANTE: f.feature._match o f._match según la versión. 
             // Probemos con f._match que es donde lo guardaste en el filter.
             color: ids.length === 1 ? "#e74c3c" : getColor(f._match || ""), 
-            weight: 6, 
+            weight: 8, 
             opacity: 0.8, 
             interactive: false 
         })
@@ -647,7 +647,7 @@ function generarInforme() {
                 .cuadra-table td, .ruta-table td { padding: 4px; border-bottom: 1px solid #eee; }
                 .label { display: block; font-size: 8px; color: #666; font-weight: bold; text-transform: uppercase; }
                 .value { font-size: 11px; font-weight: bold; }
-                #map-static { flex-grow: 1; width: 100%; border: 1px solid #000; }
+                #map-static { flex-grow: 1; width: 100%; border: 1px solid #000; background-color: #ffffff !important; background: #ffffff !important;}
                 .footer-stamp { font-size: 8px; color: #999; text-align: right; margin-top: 5px; }
                 @media print { .toolbar { display: none; } body { background: white; } .a4-page { margin: 0; border: none; } }
             </style>
@@ -671,13 +671,16 @@ function generarInforme() {
             </div>
             <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
             <script>
-                const map = L.map('map-static', { zoomControl: false, attributionControl: false });
-
+                const map = L.map('map-static', { zoomControl: false, attributionControl: false, background: '#fff' });
+                const mapDiv = document.getElementById('map-static');
+                mapDiv.style.background = "white";
+                mapDiv.style.backgroundColor = "white";
+                document.getElementById('map-static').style.background = 'white';
                 // L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
 
                 L.tileLayer('Browser/teselas/{z}/{x}/{y}.png', {
                     minZoom: 5,
-                    maxZoom: 19,
+                    maxZoom: 18,
                     tms: false,
                     attribution: 'Mis datos, QGIS'
                 }).addTo(map);
@@ -689,7 +692,7 @@ function generarInforme() {
                 let layerLineas;
                 if(lineas.length > 0) {
                     layerLineas = L.geoJSON(lineas, { 
-                        style: { color: "#e74c3c", weight: 8, opacity: 0.5 } 
+                        style: { color: "#e74c3c", weight: 16, opacity: 0.8 } 
                     }).addTo(map);
                 }
 
@@ -731,6 +734,5 @@ function generarInforme() {
     }
 }
 // Iniciar Combos al cargar
-
 
 initCombos();
