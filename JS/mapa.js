@@ -4,6 +4,8 @@ let capR = L.layerGroup(), capE = L.layerGroup(), capC = L.layerGroup();
 const mapasBase = {
     'URBASUR': L.tileLayer('Browser/teselas/{z}/{x}/{y}.png', {
         attribution: '&copy; URBA'
+        minZoom: 3,
+        maxZoom: 19,
     }),
     'carto_light': L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; CARTO'
@@ -14,8 +16,6 @@ const mapasBase = {
     // REEMPLAZO DE GCBA: Mapa Oficial del Instituto Geográfico Nacional (IGN)
     'ign': L.tileLayer('https://wms.ign.gob.ar/geoserver/gwc/service/tms/1.0.0/capabaseargenmap@EPSG%3A3857@png/{z}/{x}/{-y}.png', {
         attribution: '&copy; Instituto Geográfico Nacional',
-        minZoom: 3,
-        maxZoom: 18
     }),
     // GOOGLE STREETS (Solo dibujo/callejero)
    'google_streets': L.tileLayer('https://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}', {
@@ -677,7 +677,7 @@ function generarInforme() {
 
                 L.tileLayer('Browser/teselas/{z}/{x}/{y}.png', {
                     minZoom: 5,
-                    maxZoom: 18,
+                    maxZoom: 19,
                     tms: false,
                     attribution: 'Mis datos, QGIS'
                 }).addTo(map);
