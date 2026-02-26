@@ -37,12 +37,29 @@
             <hr style="border:0; border-top:1px solid #eee; margin:20px 0;">
             
             <div class="field-group">
+                <label>3. Localizar por Dirección o Intersección</label>
+                <input type="text" id="inCalle" placeholder="Calle 1..." onfocus="limpiarTodoBusqueda()"  oninput="sugerir(this.value, 'sugList')" onkeydown="navTeclado(event)">
+                <div id="sugList" class="suggestion-list hidden"></div>
+
+                <div style="display: flex; gap: 5px; margin-top: 10px;">
+                    <input type="number" id="inAlt" placeholder="Altura..." style="flex: 1;">
+                    <input type="text" id="inCalle2" placeholder="Calle 2 (Cruce)..." oninput="sugerir(this.value, 'sugList2')" style="flex: 2;" onkeydown="navTeclado(event)">
+                </div>
+                <div id="sugList2" class="suggestion-list hidden"></div>
+
+                <div style="display: flex; gap: 5px; margin-top: 5px;">
+                    <button class="btn-action" onclick="buscarCuadra()" style="flex: 1;">BUSCAR ALTURA</button>
+                    <button class="btn-action" onclick="buscarInterseccion()" style="flex: 1; background-color: #27ae60;">BUSCAR CRUCE</button>
+                </div>
+            </div>
+
+            <!-- <div class="field-group">
                 <label>3. Localizar Cuadra</label>
                 <input type="text" id="inCalle" placeholder="Nombre de calle..." onfocus="limpiarTodoBusqueda()" oninput="sugerir(this.value)" onkeydown="navTeclado(event)">
                 <div id="sugList" class="suggestion-list hidden"></div>
                 <input type="number" id="inAlt" placeholder="Altura..." onkeypress="if(event.key==='Enter') buscarCuadra()" style="margin-top:10px;">
                 <button class="btn-action" onclick="buscarCuadra()" style="margin-top:5px;">BUSCAR DIRECCIÓN</button>
-            </div>
+            </div> -->
             
             <!-- <button class="btn-action" style="background:var(--danger); margin-top:20px;" onclick="limpiarTodo()">LIMPIAR MAPA</button> -->
         </div>
@@ -112,5 +129,4 @@
 <script src="JS/mapa.js"></script>
 
 </body>
-
 </html>
