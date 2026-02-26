@@ -237,7 +237,15 @@ function limpiarCombos() {
 }
 
 function limpiarBusquedaRuta() { document.getElementById('inRuta').value = ""; }
-function limpiarTodoBusqueda() { limpiarCombos(); limpiarBusquedaRuta(); }
+
+function limpiarTodoBusqueda() {
+    document.getElementById('inCalle').value = "";
+    document.getElementById('inCalle2').value = "";
+    document.getElementById('inAlt').value = "";
+    document.getElementById('sugList').classList.add('hidden');
+    document.getElementById('sugList2').classList.add('hidden');
+    sugIdx = -1; // Muy importante reiniciar el índice aquí
+}
 
 function limpiarCapas(rutas = true, cuadra = true) {
     if(rutas) { capR.clearLayers(); capE.clearLayers(); }
@@ -420,15 +428,44 @@ function manejarFiltros(e) {
         }
     }
 }
-function sugerir(t) {
-    const list = document.getElementById('sugList');
+
+function sugerir(t, listId) {
+    const list = document.getElementById(listId);
     if(t.length < 3) { list.classList.add('hidden'); return; }
-    const ops = [...new Set(misRutas.features.map(f=>f.properties.NOMOFICIAL).filter(n=>n && n.includes(t.toUpperCase())))].sort().slice(0,10);
-    list.innerHTML = ops.map(o=>`<div class="suggestion-item" onclick="selCalle('${o}')">${o}</div>`).join('');
+    
+    const ops = [...new Set(misRutas.features
+        .map(f => f.properties.NOMOFICIAL)
+        .filter(n => n && n.includes(t.toUpperCase())))]
+        .sort().slice(0, 10);
+
+    const inputId = (listId === 'sugList') ? 'inCalle' : 'inCalle2';
+    
+    list.innerHTML = ops.map(o => 
+        `<div class="suggestion-item" onclick="selCalle('${o}', '${inputId}')">${o}</div>`
+    ).join('');
+    
     list.classList.toggle('hidden', !ops.length);
 }
 
-function selCalle(n) { document.getElementById('inCalle').value=n; document.getElementById('sugList').classList.add('hidden'); document.getElementById('inAlt').focus(); }
+function selCalle(nombre, targetId) { 
+    // Forzamos el uso del targetId que viene de la sugerencia
+    const input = document.getElementById(targetId);
+    if (input) {
+        input.value = nombre; 
+    }
+    
+    // Ocultar ambas listas
+    document.querySelectorAll('.suggestion-list').forEach(l => l.classList.add('hidden'));
+    
+    // LÓGICA DE FLUJO:
+    if(targetId === 'inCalle') {
+        // Si es la calle 1, vamos a la altura
+        document.getElementById('inAlt').focus();
+    } else if (targetId === 'inCalle2') {
+        // Si es la calle 2, BUSCAMOS AUTOMÁTICAMENTE
+        buscarInterseccion();
+    }
+}
 
 function buscarCuadra() {
     const c = document.getElementById('inCalle').value.toUpperCase(), a = parseInt(document.getElementById('inAlt').value);
@@ -439,12 +476,103 @@ function buscarCuadra() {
     if(f) { limpiarCapas(true, true); mostrarFicha(f); } else alert("Dirección no encontrada");
 }
 
+function buscarInterseccion() {
+    const c1 = document.getElementById('inCalle').value.toUpperCase().trim();
+    const c2 = document.getElementById('inCalle2').value.toUpperCase().trim();
+
+    if (!c1 || !c2) return alert("Ingrese ambas calles para buscar el cruce.");
+
+    const cuadrasC1 = misRutas.features.filter(f => f.properties.NOMOFICIAL === c1);
+    const cuadrasC2 = misRutas.features.filter(f => f.properties.NOMOFICIAL === c2);
+
+    if (cuadrasC1.length === 0 || cuadrasC2.length === 0) {
+        return alert("No se encontró una de las calles en la base de datos.");
+    }
+
+    let encontrada = null;
+    let puntoCruce = null;
+
+    // Tolerancia para considerar que dos puntos son el mismo (aprox 1 metro)
+    const tolerancia = 0.0001; 
+
+    for (let f1 of cuadrasC1) {
+        // Obtenemos coordenadas aplanadas (por si es MultiLineString)
+        const coords1 = f1.geometry.type === "MultiLineString" 
+                        ? f1.geometry.coordinates.flat() 
+                        : f1.geometry.coordinates;
+        
+        for (let f2 of cuadrasC2) {
+            const coords2 = f2.geometry.type === "MultiLineString" 
+                            ? f2.geometry.coordinates.flat() 
+                            : f2.geometry.coordinates;
+
+            for (let p1 of coords1) {
+                for (let p2 of coords2) {
+                    // Comparamos con margen de error
+                    const distLat = Math.abs(p1[1] - p2[1]);
+                    const distLon = Math.abs(p1[0] - p2[0]);
+
+                    if (distLat < tolerancia && distLon < tolerancia) {
+                        encontrada = f1;
+                        puntoCruce = [p1[1], p1[0]]; // Guardamos para el marcador [lat, lon]
+                        break;
+                    }
+                }
+                if (encontrada) break;
+            }
+            if (encontrada) break;
+        }
+        if (encontrada) break;
+    }
+
+    if (encontrada && puntoCruce) {
+        limpiarCapas(true, true);
+        mostrarFicha(encontrada);
+
+        // Agregamos el marcador en el cruce
+        const marker = L.circleMarker(puntoCruce, {
+            radius: 10,
+            fillColor: "#ffec00",
+            color: "#000",
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 0.8
+        }).addTo(capC); // Lo agregamos a la capa de cuadras para que se limpie solo después
+
+        marker.bindPopup(`<b>Intersección</b><br>${c1} y ${c2}`).openPopup();
+        
+        map.setView(puntoCruce, 18);
+    } else {
+        alert("No se detectó un punto de contacto técnico entre las calles. Verifique que los nombres coincidan exactamente con la base.");
+    }
+}
+
 function navTeclado(e) {
     const items = document.querySelectorAll('.suggestion-item');
     if(!items.length) return;
-    if(e.key==="ArrowDown") { e.preventDefault(); sugIdx=(sugIdx+1)%items.length; highlight(items); }
-    else if(e.key==="ArrowUp") { e.preventDefault(); sugIdx=(sugIdx-1+items.length)%items.length; highlight(items); }
-    else if(e.key==="Enter") { e.preventDefault(); if(sugIdx>-1) selCalle(items[sugIdx].innerText); }
+
+    // Detectamos automáticamente si estamos en inCalle o inCalle2
+    const inputId = e.target.id; 
+
+    if(e.key === "ArrowDown") { 
+        e.preventDefault(); 
+        sugIdx = (sugIdx + 1) % items.length; 
+        highlight(items); 
+    } 
+    else if(e.key === "ArrowUp") { 
+        e.preventDefault(); 
+        sugIdx = (sugIdx - 1 + items.length) % items.length; 
+        highlight(items); 
+    } 
+    else if(e.key === "Enter") { 
+        e.preventDefault(); 
+        if(sugIdx > -1) {
+            // Pasamos el texto Y el id del input actual
+            selCalle(items[sugIdx].innerText, inputId); 
+            // Reiniciamos el índice para la próxima búsqueda
+            sugIdx = -1; 
+        } 
+    }
 }
 
 function highlight(items) { items.forEach((it,i)=>it.classList.toggle('active', i===sugIdx)); }
