@@ -719,9 +719,10 @@ function generarInforme() {
     }
 
     // 4. CAPTURA DE CAPAS (Líneas y Puntos)
+    /*
     let puntosParaInforme = [];
     const mappingNombres = { 'verdes': 'VERDE', 'laterales': 'LATERAL', 'bilaterales': 'BILATERAL', 'soterrados': 'SOTERRADO' };
-
+    
     Object.keys(mappingNombres).forEach(key => {
         if (capasContenedores[key] && map.hasLayer(capasContenedores[key])) {
             puntosParaInforme.push(capasContenedores[key].toGeoJSON());
@@ -731,7 +732,7 @@ function generarInforme() {
     const capasActivas = [];
     capR.eachLayer(l => capasActivas.push(l.toGeoJSON()));
     capC.eachLayer(l => capasActivas.push(l.toGeoJSON()));
-
+*/
     // 5. CONSTRUCCIÓN DEL HTML
     let tablaSuperior = "";
     if (esRuta) {
@@ -829,15 +830,6 @@ function generarInforme() {
                     }).addTo(map);
                 }
 
-                puntos.forEach(gj => {
-                    L.geoJSON(gj, {
-                        pointToLayer: (f, latlng) => {
-                            let cod = (f.properties.COD_EQUIPA || "VERDE").toString().trim().toUpperCase();
-                            return L.circleMarker(latlng, { radius: 5, fillColor: colsPuntos[cod] || "#000", color: "#fff", weight: 1, fillOpacity: 0.9 });
-                        }
-                    }).addTo(map);
-                });
-
                 if (layerLineas) {
                     setTimeout(() => {
                         map.invalidateSize();
@@ -870,4 +862,5 @@ function generarInforme() {
 
 
 initCombos();
+
 
