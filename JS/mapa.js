@@ -35,7 +35,7 @@ const coloresPuntos = {
 };
 
 // Objeto para almacenar las capas
-let capasContenedores = {
+/*let capasContenedores = {
     verdes: null,
     laterales: null,
     bilaterales: null,
@@ -44,7 +44,7 @@ let capasContenedores = {
 };
 
 // Diccionario para vincular ID de HTML con nombre de capa
-/*
+
 const mappingChecks = {
     'check-verdes': 'verdes',
     'check-laterales': 'laterales',
@@ -52,7 +52,7 @@ const mappingChecks = {
     'check-soterrados': 'soterrados'
     //'check-cestos': 'cestos'
 };
-*/
+
 function inicializarCapasPuntos() {
     const crearEstiloPunto = (color) => ({
         radius: 5,
@@ -96,7 +96,7 @@ function inicializarCapasPuntos() {
         capasContenedores.soterrados = crearCapaFiltrada('SOTERRADO', coloresPuntos.SOTERRADO);
         //capasContenedores.cestos = crearCapaFiltrada('CESTO', coloresPuntos.CESTO);
     }
-
+*/
     // 3. Vincular Eventos
    /*
     const mapping = { 'check-verdes': 'verdes', 'check-laterales': 'laterales', 'check-bilaterales': 'bilaterales', 'check-soterrados': 'soterrados', 'check-cestos': 'cestos' };
@@ -109,7 +109,7 @@ function inicializarCapasPuntos() {
             });
         }
     });
-    */
+    
 }
 
 // Ejecutar cuando el mapa esté listo
@@ -593,7 +593,7 @@ function limpiarTodo() {
     document.querySelectorAll('input, select').forEach(el => el.value = "");
     ['dTur','dFre','dRut'].forEach(id=>document.getElementById(id).classList.add('hidden'));
 }
-
+/*
 function inicializarCapasPuntos() {
     // Esta función interna asegura que el estilo use SIEMPRE los colores de tu constante global
     const obtenerEstiloPunto = (tipo) => ({
@@ -643,7 +643,7 @@ function inicializarCapasPuntos() {
     }
 
     // 3. Vincular Eventos a Checkboxes
-   /* const mapping = { 
+    const mapping = { 
         'check-verdes': 'verdes', 
         'check-laterales': 'laterales', 
         'check-bilaterales': 'bilaterales', 
@@ -870,3 +870,4 @@ function generarInforme() {
 
 
 initCombos();
+
