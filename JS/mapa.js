@@ -44,6 +44,7 @@ let capasContenedores = {
 };
 
 // Diccionario para vincular ID de HTML con nombre de capa
+/*
 const mappingChecks = {
     'check-verdes': 'verdes',
     'check-laterales': 'laterales',
@@ -51,7 +52,7 @@ const mappingChecks = {
     'check-soterrados': 'soterrados'
     //'check-cestos': 'cestos'
 };
-
+*/
 function inicializarCapasPuntos() {
     const crearEstiloPunto = (color) => ({
         radius: 5,
@@ -97,6 +98,7 @@ function inicializarCapasPuntos() {
     }
 
     // 3. Vincular Eventos
+   /*
     const mapping = { 'check-verdes': 'verdes', 'check-laterales': 'laterales', 'check-bilaterales': 'bilaterales', 'check-soterrados': 'soterrados', 'check-cestos': 'cestos' };
     Object.keys(mapping).forEach(id => {
         const el = document.getElementById(id);
@@ -107,6 +109,7 @@ function inicializarCapasPuntos() {
             });
         }
     });
+    */
 }
 
 // Ejecutar cuando el mapa esté listo
@@ -116,7 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Asignar los eventos
-Object.keys(mappingChecks).forEach(id => {
+/*Object.keys(mappingChecks).forEach(id => {
     document.getElementById(id).addEventListener('change', function(e) {
         const capaKey = mappingChecks[id];
         if (e.target.checked) {
@@ -126,6 +129,7 @@ Object.keys(mappingChecks).forEach(id => {
         }
     });
 });
+*/
 
 // 1. Procesar Datos Operativos
 try {
@@ -639,7 +643,7 @@ function inicializarCapasPuntos() {
     }
 
     // 3. Vincular Eventos a Checkboxes
-    const mapping = { 
+   /* const mapping = { 
         'check-verdes': 'verdes', 
         'check-laterales': 'laterales', 
         'check-bilaterales': 'bilaterales', 
@@ -662,6 +666,7 @@ function inicializarCapasPuntos() {
             };
         }
     });
+    */
 }
 
 // Función auxiliar para crear el círculo
@@ -862,5 +867,6 @@ function generarInforme() {
     }
 }
 // Iniciar Combos al cargar
+
 
 initCombos();
