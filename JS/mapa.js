@@ -666,8 +666,8 @@ function inicializarCapasPuntos() {
             };
         }
     });
-    */
 }
+*/
 
 // Función auxiliar para crear el círculo
 function crearMarcador(latlng, color) {
@@ -862,5 +862,6 @@ function generarInforme() {
 
 
 initCombos();
+
 
 
