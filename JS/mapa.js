@@ -35,7 +35,7 @@ const coloresPuntos = {
 };
 
 // Objeto para almacenar las capas
-let capasContenedores = {
+/*let capasContenedores = {
     verdes: null,
     laterales: null,
     bilaterales: null,
@@ -44,6 +44,7 @@ let capasContenedores = {
 };
 
 // Diccionario para vincular ID de HTML con nombre de capa
+
 const mappingChecks = {
     'check-verdes': 'verdes',
     'check-laterales': 'laterales',
@@ -95,8 +96,9 @@ function inicializarCapasPuntos() {
         capasContenedores.soterrados = crearCapaFiltrada('SOTERRADO', coloresPuntos.SOTERRADO);
         //capasContenedores.cestos = crearCapaFiltrada('CESTO', coloresPuntos.CESTO);
     }
-
+*/
     // 3. Vincular Eventos
+   /*
     const mapping = { 'check-verdes': 'verdes', 'check-laterales': 'laterales', 'check-bilaterales': 'bilaterales', 'check-soterrados': 'soterrados', 'check-cestos': 'cestos' };
     Object.keys(mapping).forEach(id => {
         const el = document.getElementById(id);
@@ -107,6 +109,7 @@ function inicializarCapasPuntos() {
             });
         }
     });
+    
 }
 
 // Ejecutar cuando el mapa esté listo
@@ -116,7 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Asignar los eventos
-Object.keys(mappingChecks).forEach(id => {
+/*Object.keys(mappingChecks).forEach(id => {
     document.getElementById(id).addEventListener('change', function(e) {
         const capaKey = mappingChecks[id];
         if (e.target.checked) {
@@ -126,6 +129,7 @@ Object.keys(mappingChecks).forEach(id => {
         }
     });
 });
+*/
 
 // 1. Procesar Datos Operativos
 try {
@@ -589,7 +593,7 @@ function limpiarTodo() {
     document.querySelectorAll('input, select').forEach(el => el.value = "");
     ['dTur','dFre','dRut'].forEach(id=>document.getElementById(id).classList.add('hidden'));
 }
-
+/*
 function inicializarCapasPuntos() {
     // Esta función interna asegura que el estilo use SIEMPRE los colores de tu constante global
     const obtenerEstiloPunto = (tipo) => ({
@@ -663,6 +667,7 @@ function inicializarCapasPuntos() {
         }
     });
 }
+*/
 
 // Función auxiliar para crear el círculo
 function crearMarcador(latlng, color) {
@@ -714,9 +719,10 @@ function generarInforme() {
     }
 
     // 4. CAPTURA DE CAPAS (Líneas y Puntos)
+    /*
     let puntosParaInforme = [];
     const mappingNombres = { 'verdes': 'VERDE', 'laterales': 'LATERAL', 'bilaterales': 'BILATERAL', 'soterrados': 'SOTERRADO' };
-
+    
     Object.keys(mappingNombres).forEach(key => {
         if (capasContenedores[key] && map.hasLayer(capasContenedores[key])) {
             puntosParaInforme.push(capasContenedores[key].toGeoJSON());
@@ -726,7 +732,7 @@ function generarInforme() {
     const capasActivas = [];
     capR.eachLayer(l => capasActivas.push(l.toGeoJSON()));
     capC.eachLayer(l => capasActivas.push(l.toGeoJSON()));
-
+*/
     // 5. CONSTRUCCIÓN DEL HTML
     let tablaSuperior = "";
     if (esRuta) {
@@ -824,15 +830,6 @@ function generarInforme() {
                     }).addTo(map);
                 }
 
-                puntos.forEach(gj => {
-                    L.geoJSON(gj, {
-                        pointToLayer: (f, latlng) => {
-                            let cod = (f.properties.COD_EQUIPA || "VERDE").toString().trim().toUpperCase();
-                            return L.circleMarker(latlng, { radius: 5, fillColor: colsPuntos[cod] || "#000", color: "#fff", weight: 1, fillOpacity: 0.9 });
-                        }
-                    }).addTo(map);
-                });
-
                 if (layerLineas) {
                     setTimeout(() => {
                         map.invalidateSize();
@@ -863,4 +860,8 @@ function generarInforme() {
 }
 // Iniciar Combos al cargar
 
+
 initCombos();
+
+
+
