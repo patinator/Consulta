@@ -719,7 +719,7 @@ function generarInforme() {
     }
 
     // 4. CAPTURA DE CAPAS (Líneas y Puntos)
-    /*
+    
     let puntosParaInforme = [];
     const mappingNombres = { 'verdes': 'VERDE', 'laterales': 'LATERAL', 'bilaterales': 'BILATERAL', 'soterrados': 'SOTERRADO' };
     
@@ -732,7 +732,7 @@ function generarInforme() {
     const capasActivas = [];
     capR.eachLayer(l => capasActivas.push(l.toGeoJSON()));
     capC.eachLayer(l => capasActivas.push(l.toGeoJSON()));
-*/
+
     // 5. CONSTRUCCIÓN DEL HTML
     let tablaSuperior = "";
     if (esRuta) {
