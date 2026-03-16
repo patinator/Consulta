@@ -593,7 +593,7 @@ function limpiarTodo() {
     document.querySelectorAll('input, select').forEach(el => el.value = "");
     ['dTur','dFre','dRut'].forEach(id=>document.getElementById(id).classList.add('hidden'));
 }
-/*
+
 function inicializarCapasPuntos() {
     // Esta función interna asegura que el estilo use SIEMPRE los colores de tu constante global
     const obtenerEstiloPunto = (tipo) => ({
