@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuración de Rutas y Supervisores</title>
+    <script src="RUTAS.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f6f9;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #1e3a8a;
+            margin-top: 0;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 10px;
+        }
+        p {
+            color: #64748b;
+            font-size: 14px;
+        }
+        .actions-bar {
+            margin: 20px 0;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 10px 16px;
+            font-size: 14px;
+            font-weight: 600;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-primary { background-color: #2563eb; color: white; }
+        .btn-primary:hover { background-color: #1d4ed8; }
+        .btn-success { background-color: #16a34a; color: white; }
+        .btn-success:hover { background-color: #15803d; }
+        .btn-secondary { background-color: #475569; color: white; }
+        .btn-secondary:hover { background-color: #334155; }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        th {
+            background-color: #f8fafc;
+            color: #475569;
+            text-align: left;
+            padding: 12px;
+            border: 1px solid #e2e8f0;
+            font-size: 14px;
+        }
+        td {
+            padding: 10px 12px;
+            border: 1px solid #e2e8f0;
+            font-size: 14px;
+        }
+        tr:nth-child(even) td {
+            background-color: #f8fafc;
+        }
+        .ruta-cell {
+            font-weight: bold;
+            color: #0f172a;
+            background-color: #f1f5f9 !important;
+            width: 25%;
+        }
+        select {
+            padding: 8px;
+            width: 100%;
+            max-width: 350px;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            background-color: #fff;
+            color: #334155;
+            font-size: 14px;
+            outline: none;
+        }
+        select:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
+        }
+        .status-msg {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 13px;
+            display: none;
+        }
+        .status-success { background-color: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Configuración de Rutas y Supervisores</h2>
+    <p>Este panel lee la estructura de <strong>RUTAS.js</strong>, mapea las relaciones únicas de rutas (RDOMTN) y te permite cambiar o asignar supervisores (SDOMTN).</p>
+    
+    <div class="actions-bar">
+        <button class="btn-primary" onclick="inicializarMapeoConfig()">Cargar / Resetear Datos</button>
+        <button class="btn-success" onclick="agregarNuevoSupervisor()">+ Agregar Nuevo Supervisor</button>
+        <button class="btn-secondary" onclick="descargarRutasActualizadas()">💾 Guardar y Descargar RUTAS.js</button>
+    </div>
+
+    <div id="status-box" class="status-msg status-success"></div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Ruta (RDOMTN)</th>
+                <th>Supervisor Asignado (SDOMTN)</th>
+            </tr>
+        </thead>
+        <tbody id="body-config-rutas">
+            <tr>
+                <td colspan="2" style="text-align: center; padding: 30px; color: #94a3b8;">
+                    Presiona "Cargar / Resetear Datos" para leer el archivo RUTAS.js
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<script>
+    let listaSupervisores = [];
+    let mapaRutaSupervisor = {}; // Almacena { "NroRuta": "Supervisor" }
+
+    // Función que corre automáticamente al abrir la página por comodidad
+    window.onload = function() {
+        if (typeof rutasData !== 'undefined') {
+            inicializarMapeoConfig();
+        }
+    };
+
+    function mostrarLog(mensaje) {
+        const box = document.getElementById("status-box");
+        box.textContent = mensaje;
+        box.style.display = "block";
+        setTimeout(() => { box.style.display = "none"; }, 4000);
+    }
+
+    function inicializarMapeoConfig() {
+        if (typeof rutasData === 'undefined') {
+            alert("Error: No se detectó 'rutasData'. Asegúrate de que este archivo HTML esté en la misma carpeta que 'RUTAS.js'.");
+            return;
+        }
+
+        const setRutas = new Set();
+        const setSupervisores = new Set();
+        mapaRutaSupervisor = {};
+
+        // 1. Procesar el GeoJSON de rutasData
+        rutasData.features.forEach(f => {
+            const props = f.properties;
+            const ruta = props.RDOMTN ? props.RDOMTN.toString().trim() : "";
+            const superv = props.SDOMTN ? props.SDOMTN.toString().trim() : "";
+
+            if (ruta && ruta !== "0") {
+                setRutas.add(ruta);
+                if (superv) {
+                    mapaRutaSupervisor[ruta] = superv;
+                    setSupervisores.add(superv);
+                }
+            }
+        });
+
+        // Convertir y ordenar listas
+        const arrayRutas = Array.from(setRutas).sort((a, b) => a.localeCompare(b, undefined, {numeric: true}));
+        listaSupervisores = Array.from(setSupervisores).sort();
+
+        renderizarTablaConfig(arrayRutas);
+        mostrarLog("Datos cargados correctamente desde el archivo RUTAS.js.");
+    }
+
+    function renderizarTablaConfig(arrayRutas) {
+        const tbody = document.getElementById("body-config-rutas");
+        tbody.innerHTML = "";
+
+        if (arrayRutas.length === 0) {
+            tbody.innerHTML = "<tr><td colspan='2' style='text-align:center;'>No se encontraron rutas con identificador RDOMTN válido.</td></tr>";
+            return;
+        }
+
+        arrayRutas.forEach(ruta => {
+            const supervisorActual = mapaRutaSupervisor[ruta] || "";
+            
+            let opcionesSelect = `<option value="">-- Sin Asignar --</option>`;
+            listaSupervisores.forEach(sup => {
+                const seleccionado = (sup === supervisorActual) ? "selected" : "";
+                opcionesSelect += `<option value="${sup}" ${seleccionado}>${sup}</option>`;
+            });
+
+            const fila = document.createElement("tr");
+            fila.innerHTML = `
+                <td class="ruta-cell">Ruta ${ruta}</td>
+                <td>
+                    <select onchange="actualizarAsignacionRuta('${ruta}', this.value)" class="select-supervisor" data-ruta="${ruta}">
+                        ${opcionesSelect}
+                    </select>
+                </td>
+            `;
+            tbody.appendChild(fila);
+        });
+    }
+
+    function actualizarAsignacionRuta(ruta, nuevoSupervisor) {
+        mapaRutaSupervisor[ruta] = nuevoSupervisor;
+
+        // Modificar directamente los objetos en memoria dentro de rutasData
+        let contadorSegmentos = 0;
+        rutasData.features.forEach(f => {
+            if (f.properties.RDOMTN && f.properties.RDOMTN.toString().trim() === ruta) {
+                f.properties.SDOMTN = nuevoSupervisor;
+                contadorSegmentos++;
+            }
+        });
+
+        console.log(`Ruta ${ruta} mapeada a: ${nuevoSupervisor || 'NINGUNO'} (${contadorSegmentos} tramos actualizados en memoria).`);
+    }
+
+    function agregarNuevoSupervisor() {
+        const nuevoSup = prompt("Escribe el APELLIDO del nuevo supervisor:");
+        if (!nuevoSup) return;
+        
+        const nombreLimpio = nuevoSup.trim().toUpperCase();
+        
+        if (listaSupervisores.includes(nombreLimpio)) {
+            alert("Ese supervisor ya se encuentra en la lista.");
+            return;
+        }
+
+        // Resguardar selecciones actuales del usuario en pantalla antes de redibujar
+        const todosLosSelects = document.querySelectorAll(".select-supervisor");
+        todosLosSelects.forEach(select => {
+            const r = select.getAttribute("data-ruta");
+            mapaRutaSupervisor[r] = select.value;
+        });
+
+        // Insertar nuevo supervisor en la lista global y ordenar
+        listaSupervisores.push(nombreLimpio);
+        listaSupervisores.sort();
+
+        // Obtener el listado de rutas actuales para re-renderizar la tabla
+        const arrayRutas = Object.keys(mapaRutaSupervisor).sort((a, b) => a.localeCompare(b, undefined, {numeric: true}));
+        renderizarTablaConfig(arrayRutas);
+        
+        mostrarLog(`Supervisor "${nombreLimpio}" agregado a las opciones.`);
+    }
+
+    function descargarRutasActualizadas() {
+        if (typeof rutasData === 'undefined') return;
+        
+        // Reconstruimos la estructura exacta del archivo js original
+        const contenidoArchivo = `var rutasData = ${JSON.stringify(rutasData, null, 2)};`;
+        
+        const blob = new Blob([contenidoArchivo], { type: "text/javascript" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "RUTAS.js";
+        link.click();
+        
+        mostrarLog("Archivo RUTAS.js generado. Reemplaza el archivo viejo de tu carpeta con este descargado.");
+    }
+</script>
+
+</body>
+</html>
