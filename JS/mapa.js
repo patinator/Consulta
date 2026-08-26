@@ -808,7 +808,7 @@ function generarInforme() {
 
                 L.tileLayer('Browser/teselas/{z}/{x}/{y}.png', {
                     minZoom: 5,
-                    maxZoom: 18,
+                    maxZoom: 20,
                     tms: false,
                     attribution: 'Mis datos, QGIS'
                 }).addTo(map);
