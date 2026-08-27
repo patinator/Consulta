@@ -688,50 +688,173 @@ function generarInforme() {
 
     // 2. CAPTURA DE DATOS TÉCNICOS
     const datosArray = Array.from(contenido.querySelectorAll('.data-card')).map(card => ({
-        label: card.querySelector('span').innerText.trim(), // Sin toLowerCase aquí para comparar mejor
-        valor: card.querySelector('p').innerText.trim()
+        label: card.querySelector('span')?.innerText.trim() || "",
+        valor: card.querySelector('p')?.innerText.trim() || ""
     }));
 
     const esRuta = contenido.innerHTML.includes("DETALLE RUTA");
 
-    // 3. LÓGICA DE TÍTULOS (Corregida)
-    let tituloInforme = "";
-    if (esRuta) {
-        // Buscamos ignorando mayúsculas/minúsculas
-        const obtenerValor = (txt) => datosArray.find(d => d.label.toLowerCase().includes(txt.toLowerCase()))?.valor || "";
-        const numRuta = obtenerValor("ruta");
-        
-        // Si numRuta sigue vacío, intentamos sacarlo del h3 del sidebar como plan B
-        const backupRuta = numRuta || contenido.querySelector('h3')?.innerText.replace(/[^0-9]/g, '') || "";
-        
-        tituloInforme = `DETALLE DE RUTA ${backupRuta}`;
-    } else {
-        const obtenerValor = (txt) => datosArray.find(d => d.label.toLowerCase().includes(txt.toLowerCase()))?.valor || "";
-        const calle = obtenerValor("calle");
-        const barrio = obtenerValor("barrio");
-        const comunaVal = obtenerValor("comuna");
-        tituloInforme = `${calle} - ${barrio} - COMUNA ${comunaVal}`;
-    }
+    // 3. OBTENCIÓN DE VALORES CLAVE
+    const obtenerValor = (txt) => datosArray.find(d => d.label.toLowerCase().includes(txt.toLowerCase()))?.valor || "";
 
     // 4. CAPTURA DE CAPAS (Líneas y Puntos)
     let puntosParaInforme = [];
     const mappingNombres = { 'verdes': 'VERDE', 'laterales': 'LATERAL', 'bilaterales': 'BILATERAL', 'soterrados': 'SOTERRADO' };
 
     Object.keys(mappingNombres).forEach(key => {
-        if (capasContenedores[key] && map.hasLayer(capasContenedores[key])) {
+        if (typeof capasContenedores !== 'undefined' && capasContenedores[key] && map.hasLayer(capasContenedores[key])) {
             puntosParaInforme.push(capasContenedores[key].toGeoJSON());
         }
     });
 
     const capasActivas = [];
-    capR.eachLayer(l => capasActivas.push(l.toGeoJSON()));
-    capC.eachLayer(l => capasActivas.push(l.toGeoJSON()));
+    if (typeof capR !== 'undefined') capR.eachLayer(l => capasActivas.push(l.toGeoJSON()));
+    if (typeof capC !== 'undefined') capC.eachLayer(l => capasActivas.push(l.toGeoJSON()));
 
-    // 5. CONSTRUCCIÓN DEL HTML
-    let tablaSuperior = "";
+    const ventana = window.open('', 'Reporte', 'width=1100,height=800');
+
+    // =========================================================================
+    // CASO 1: REPORTE DE RUTA (FORMATO A3 LANDSCAPE CON CAJETÍN TÉCNICO)
+    // =========================================================================
     if (esRuta) {
-        tablaSuperior = `<table class="ruta-table">${generarFilasTabla(datosArray, 2, 100)}</table>`;
-    } else {
+        const numRuta = obtenerValor("ruta") || contenido.querySelector('h3')?.innerText.replace(/[^0-9-]/g, '') || "";
+        const frecuenciaVal = obtenerValor("frecuencia") || "de Febrero de 2023";
+        const turnoVal = obtenerValor("turno") || "Turno Mañana de 06:00 a 14:00";
+        const versionVal = obtenerValor("version") || "01/02/2025";
+        const comunaVal = obtenerValor("comuna") || "0";
+
+        ventana.document.write(`
+            <!DOCTYPE html>
+            <html lang="es">
+            <head>
+                <meta charset="UTF-8">
+                <title>Reporte Técnico - Ruta ${numRuta}</title>
+                <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin=""/>
+                <style>
+                    @page { size: A3 landscape; margin: 0; }
+                    body { margin: 0; padding: 0; background-color: #525659; font-family: Arial, sans-serif; display: flex; justify-content: center; }
+                    .page { width: 420mm; height: 297mm; background: white; position: relative; box-sizing: border-box; margin: 20px auto; box-shadow: 0 0 15px rgba(0,0,0,0.5); overflow: hidden; }
+                    #map { position: absolute; bottom: 13mm; right: 13mm; width: 388mm; height: 270mm; border: 1.5px solid #000; background-color: #ffffff !important; z-index: 1; }
+                    .leaflet-container, .leaflet-pane, .leaflet-tile-pane { background-color: #ffffff !important; }
+                    
+                    /* CAJETÍN TÉCNICO */
+                    .cajetin { position: absolute; bottom: 13mm; right: 13mm; width: 98mm; height: 44mm; background: #ffffff; border: 1px solid #000000; z-index: 1000; display: flex; flex-direction: column; box-sizing: border-box; font-family: Arial, sans-serif; color: #000000; }
+                    .cajetin-row-1 { height: 9mm; border-bottom: 1px solid #000000; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; font-weight: bold; font-size: 9pt; line-height: 1.1; }
+                    .cajetin-row-2 { height: 10mm; border-bottom: 1px solid #000000; display: flex; justify-content: center; align-items: center; text-align: center; font-weight: normal; font-size: 10pt; letter-spacing: 0.2px; }
+                    .cajetin-body { height: 26mm; display: flex; }
+                    .cajetin-info { width: 74mm; display: flex; flex-direction: column; }
+                    .info-row { position: relative; display: flex; align-items: flex-end; border-bottom: 1px solid #000000; box-sizing: border-box; padding-bottom: 1mm; padding-left: 2mm; }
+                    .info-row-frecuencia { height: 9mm; }
+                    .info-row-turno { height: 9mm; }
+                    .info-row-bottom { height: 8mm; border-bottom: none; padding-bottom: 0; padding-left: 0; }
+                    .label-tech { position: absolute; top: 1px; left: 2px; font-family: 'Tahoma', sans-serif; font-size: 5pt; font-weight: bold; background: #e0e0e0; padding: 0px 2px; letter-spacing: 0.5px; }
+                    .value-text { font-size: 8.5pt; font-weight: normal; width: 100%; }
+                    .col-cell { position: relative; height: 100%; display: flex; align-items: flex-end; justify-content: center; border-right: 1px solid #000000; box-sizing: border-box; padding-bottom: 1mm; }
+                    .col-cell:last-child { border-right: none; }
+                    .col-version { width: 22mm; }
+                    .col-ruta { width: 40mm; }
+                    .col-comuna { width: 12mm; }
+                    .col-cell .value-text { text-align: center; font-size: 9pt; }
+                    .cajetin-logo { width: 24mm; height: 26mm; border-left: 1px solid #000000; display: flex; align-items: center; justify-content: center; padding: 1mm; box-sizing: border-box; }
+                    .cajetin-logo img { max-width: 100%; max-height: 100%; object-fit: contain; }
+                    
+                    .btn-print { position: fixed; top: 20px; left: 20px; padding: 12px 24px; background: #27ae60; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; z-index: 9999; box-shadow: 0 2px 5px rgba(0,0,0,0.3); font-size: 14px; }
+                    @media print { body { background: none; } .page { margin: 0; box-shadow: none; } .btn-print { display: none; } }
+                </style>
+            </head>
+            <body>
+                <button class="btn-print" onclick="window.print()">Imprimir / Guardar PDF (A3)</button>
+                <div class="page">
+                    <div id="map"></div>
+                    <div class="cajetin">
+                        <div class="cajetin-row-1">
+                            <div>SERVICIO PÚBLICO DE HIGIENE URBANA</div>
+                            <div>LICITACION PÚBLICA N 997/2013 - ZONA 07</div>
+                        </div>
+                        <div class="cajetin-row-2">
+                            PROGRAMA ROTATIVO DE LIMPIEZA DE COMUNAS
+                        </div>
+                        <div class="cajetin-body">
+                            <div class="cajetin-info">
+                                <div class="info-row info-row-frecuencia">
+                                    <span class="label-tech">FRECUENCIA</span>
+                                    <div class="value-text" style="text-align: center;">${frecuenciaVal}</div>
+                                </div>
+                                <div class="info-row info-row-turno">
+                                    <span class="label-tech">TURNO</span>
+                                    <div class="value-text" style="text-align: center;">${turnoVal}</div>
+                                </div>
+                                <div class="info-row info-row-bottom">
+                                    <div class="col-cell col-version">
+                                        <span class="label-tech">VERSION</span>
+                                        <span class="value-text">${versionVal}</span>
+                                    </div>
+                                    <div class="col-cell col-ruta">
+                                        <span class="label-tech">RUTA</span>
+                                        <span class="value-text">${numRuta}</span>
+                                    </div>
+                                    <div class="col-cell col-comuna">
+                                        <span class="label-tech">COMUNA</span>
+                                        <span class="value-text">${comunaVal}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="cajetin-logo">
+                                <img src="logo.png" alt="URBASUR" onerror="this.src='https://via.placeholder.com/100x100?text=URBASUR'">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin=""></script>
+                <script>
+                    const map = L.map('map', { zoomControl: false, attributionControl: false, fadeAnimation: false }).setView([-34.6195, -58.4365], 15);
+                    L.control.attribution({prefix: false}).addTo(map);
+
+                    L.tileLayer('file:///E:/online/Consulta/Browser/Teselas/{z}/{x}/{y}.png', {
+                        minZoom: 3, maxZoom: 19, tms: false, attribution: 'Created by QGIS'
+                    }).addTo(map);
+
+                    const lineas = ${JSON.stringify(capasActivas)};
+                    const puntos = ${JSON.stringify(puntosParaInforme)};
+                    const colsPuntos = ${typeof coloresPuntos !== 'undefined' ? JSON.stringify(coloresPuntos) : '{}'};
+
+                    let layerLineas;
+                    if(lineas.length > 0) {
+                        layerLineas = L.geoJSON(lineas, { 
+                            style: { color: "#e74c3c", weight: 8, opacity: 0.8 } 
+                        }).addTo(map);
+                    }
+
+                    puntos.forEach(gj => {
+                        L.geoJSON(gj, {
+                            pointToLayer: (f, latlng) => {
+                                let cod = (f.properties.COD_EQUIPA || "VERDE").toString().trim().toUpperCase();
+                                return L.circleMarker(latlng, { radius: 5, fillColor: colsPuntos[cod] || "#000", color: "#fff", weight: 1, fillOpacity: 0.9 });
+                            }
+                        }).addTo(map);
+                    });
+
+                    if (layerLineas) {
+                        setTimeout(() => {
+                            map.invalidateSize();
+                            map.fitBounds(layerLineas.getBounds(), { padding: [80, 80] });
+                        }, 350);
+                    }
+                <\/script>
+            </body>
+            </html>
+        `);
+    } 
+    // =========================================================================
+    // CASO 2: REPORTE DE CUADRA (FORMATO A4 VERTICAL ESTÁNDAR)
+    // =========================================================================
+    else {
+        const calle = obtenerValor("calle");
+        const barrio = obtenerValor("barrio");
+        const comunaVal = obtenerValor("comuna");
+        const tituloInforme = `${calle} - ${barrio} - COMUNA ${comunaVal}`;
+
         const rutasBrutas = [];
         contenido.querySelectorAll('.tech-table tbody tr').forEach(tr => {
             const cols = tr.querySelectorAll('td');
@@ -741,111 +864,88 @@ function generarInforme() {
                 rutasBrutas.push({ ruta: cols[0].innerText.trim(), servicio: cols[1].innerText.trim(), turno: tComp, frec: cols[3].innerText.trim() });
             }
         });
+
         const listadoHTML = ["MAÑANA", "TARDE", "NOCHE"].map(t => {
             const filtradas = rutasBrutas.filter(r => r.turno === t);
             if (!filtradas.length) return "";
             return `<div class="turno-block"><div class="turno-header">TURNO: ${t}</div><table class="cuadra-table">${filtradas.map(r => `<tr><td style="width:40px"><b>${r.ruta}</b></td><td>${r.servicio}</td><td align="right">${r.frec}</td></tr>`).join('')}</table></div>`;
         }).join('');
-        tablaSuperior = `<div class="servicios-grid">${listadoHTML}</div>`;
+        
+        const tablaSuperior = `<div class="servicios-grid">${listadoHTML}</div>`;
+
+        ventana.document.write(`
+            <!DOCTYPE html>
+            <html lang="es">
+            <head>
+                <meta charset="UTF-8">
+                <title>Reporte Técnico - Cuadra</title>
+                <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin=""/>
+                <style>
+                    @page { size: A4 portrait; margin: 0; }
+                    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #eee; }
+                    .toolbar { background: #000; padding: 10px; text-align: center; position: sticky; top: 0; z-index: 999; }
+                    .toolbar button { padding: 8px 16px; background: #27ae60; color: white; border: none; font-weight: bold; cursor: pointer; border-radius: 4px; }
+                    .a4-page { width: 210mm; height: 297mm; background: white; margin: 10px auto; padding: 10mm; box-sizing: border-box; display: flex; flex-direction: column; }
+                    .report-title { font-size: 22px; text-align: center; border-bottom: 3px solid #000; margin: 0 0 20px 0; padding-bottom: 8px; text-transform: uppercase; font-weight: bold; }
+                    .servicios-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+                    .turno-header { background: #333; color: white; font-size: 10px; padding: 4px 8px; font-weight: bold; }
+                    .cuadra-table { width: 100%; border-collapse: collapse; font-size: 10px; border: 1px solid #ccc; }
+                    .cuadra-table td { padding: 4px; border-bottom: 1px solid #eee; }
+                    #map-static { flex-grow: 1; width: 100%; border: 1px solid #000; background-color: #ffffff !important; }
+                    .footer-stamp { font-size: 8px; color: #999; text-align: right; margin-top: 5px; }
+                    @media print { .toolbar { display: none; } body { background: white; } .a4-page { margin: 0; border: none; } }
+                </style>
+            </head>
+            <body>
+                <div class="toolbar"><button onclick="window.print()">IMPRIMIR PDF</button></div>
+                <div class="a4-page">
+                    <h1 class="report-title">${tituloInforme}</h1>
+                    <div style="margin-bottom:15px;">${tablaSuperior}</div>
+                    <div id="map-static"></div>
+                    <div class="footer-stamp">Generado el: ${new Date().toLocaleString()}</div>
+                </div>
+                <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin=""></script>
+                <script>
+                    const map = L.map('map-static', { zoomControl: false, attributionControl: false, fadeAnimation: false });
+                    L.tileLayer('file:///E:/online/Consulta/Browser/Teselas/{z}/{x}/{y}.png', {
+                        minZoom: 3, maxZoom: 19, tms: false, attribution: 'Created by QGIS'
+                    }).addTo(map);
+
+                    const lineas = ${JSON.stringify(capasActivas)};
+                    const puntos = ${JSON.stringify(puntosParaInforme)};
+                    const colsPuntos = ${typeof coloresPuntos !== 'undefined' ? JSON.stringify(coloresPuntos) : '{}'};
+
+                    let layerLineas;
+                    if(lineas.length > 0) {
+                        layerLineas = L.geoJSON(lineas, { 
+                            style: { color: "#e74c3c", weight: 12, opacity: 0.8 } 
+                        }).addTo(map);
+                    }
+
+                    puntos.forEach(gj => {
+                        L.geoJSON(gj, {
+                            pointToLayer: (f, latlng) => {
+                                let cod = (f.properties.COD_EQUIPA || "VERDE").toString().trim().toUpperCase();
+                                return L.circleMarker(latlng, { radius: 5, fillColor: colsPuntos[cod] || "#000", color: "#fff", weight: 1, fillOpacity: 0.9 });
+                            }
+                        }).addTo(map);
+                    });
+
+                    if (layerLineas) {
+                        setTimeout(() => {
+                            map.invalidateSize();
+                            map.fitBounds(layerLineas.getBounds(), { padding: [350, 350] });
+                            map.setZoom(map.getZoom() - 1);
+                        }, 350);
+                    }
+                <\/script>
+            </body>
+            </html>
+        `);
     }
 
-    const ventana = window.open('', 'Reporte', 'width=900,height=1100');
-    ventana.document.write(`
-        <html>
-        <head>
-            <title>Reporte Técnico</title>
-            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-            <style>
-                @page { size: A4 portrait; margin: 0; }
-                body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #eee; }
-                .toolbar { background: #000; padding: 10px; text-align: center; position: sticky; top: 0; z-index: 999; }
-                .a4-page { width: 210mm; height: 297mm; background: white; margin: 10px auto; padding: 10mm; box-sizing: border-box; display: flex; flex-direction: column; }
-                                .report-title {
-                    font-size: 22px; 
-                    text-align: center; 
-                    border-bottom: 3px solid #000; /* Línea un poco más gruesa */
-                    margin: 0 0 20px 0; 
-                    padding-bottom: 8px; 
-                    text-transform: uppercase;
-                    font-weight: bold;
-                }
-                .servicios-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-                .turno-header { background: #333; color: white; font-size: 10px; padding: 4px 8px; font-weight: bold; }
-                .cuadra-table, .ruta-table { width: 100%; border-collapse: collapse; font-size: 10px; border: 1px solid #ccc; }
-                .cuadra-table td, .ruta-table td { padding: 4px; border-bottom: 1px solid #eee; }
-                .label { display: block; font-size: 8px; color: #666; font-weight: bold; text-transform: uppercase; }
-                .value { font-size: 11px; font-weight: bold; }
-                #map-static { flex-grow: 1; width: 100%; border: 1px solid #000; background-color: #ffffff !important; background: #ffffff !important;}
-                .footer-stamp { font-size: 8px; color: #999; text-align: right; margin-top: 5px; }
-                @media print { .toolbar { display: none; } body { background: white; } .a4-page { margin: 0; border: none; } }
-            </style>
-        </head>
-        <!-- Google tag (gtag.js) -->
-        <script async src="https://www.googletagmanager.com/gtag/js?id=G-CJKP4E2R97"></script>
-        <script>
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-        
-          gtag('config', 'G-CJKP4E2R97');
-        </script>
-        <body>
-            <div class="toolbar"><button onclick="window.print()">IMPRIMIR PDF</button></div>
-            <div class="a4-page">
-                <h1 class="report-title">${tituloInforme}</h1>
-                <div style="margin-bottom:15px;">${tablaSuperior}</div>
-                <div id="map-static"></div>
-                <div class="footer-stamp">Generado el: ${new Date().toLocaleString()}</div>
-            </div>
-            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-            <script>
-                const map = L.map('map-static', { zoomControl: false, attributionControl: false, background: '#fff' });
-                const mapDiv = document.getElementById('map-static');
-                mapDiv.style.background = "white";
-                mapDiv.style.backgroundColor = "white";
-                document.getElementById('map-static').style.background = 'white';
-                // L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
-
-                L.tileLayer('Browser/teselas/{z}/{x}/{y}.png', {
-                    minZoom: 5,
-                    maxZoom: 20,
-                    tms: false,
-                    attribution: 'Mis datos, QGIS'
-                }).addTo(map);
-
-                const lineas = ${JSON.stringify(capasActivas)};
-                const puntos = ${JSON.stringify(puntosParaInforme)};
-                const colsPuntos = ${JSON.stringify(coloresPuntos)};
-
-                let layerLineas;
-                if(lineas.length > 0) {
-                    layerLineas = L.geoJSON(lineas, { 
-                        style: { color: "#e74c3c", weight: 16, opacity: 0.8 } 
-                    }).addTo(map);
-                }
-
-                puntos.forEach(gj => {
-                    L.geoJSON(gj, {
-                        pointToLayer: (f, latlng) => {
-                            let cod = (f.properties.COD_EQUIPA || "VERDE").toString().trim().toUpperCase();
-                            return L.circleMarker(latlng, { radius: 5, fillColor: colsPuntos[cod] || "#000", color: "#fff", weight: 1, fillOpacity: 0.9 });
-                        }
-                    }).addTo(map);
-                });
-
-                if (layerLineas) {
-                    setTimeout(() => {
-                        map.invalidateSize();
-                        const pad = ${esRuta ? 80 : 350};
-                        map.fitBounds(layerLineas.getBounds(), { padding: [pad, pad] });
-                        if (!${esRuta}) { map.setZoom(map.getZoom() - 1); }
-                    }, 350);
-                }
-            </script>
-        </body>
-        </html>
-    `);
     ventana.document.close();
+}
 
     function generarFilasTabla(datos, cols, max) {
         let html = '';
