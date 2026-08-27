@@ -960,7 +960,6 @@ function generarInforme() {
         }
         return html;
     }
-}
 // Iniciar Combos al cargar
 
 initCombos();
