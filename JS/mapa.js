@@ -147,7 +147,7 @@ var map = L.map('map', {
     // --- CONTROL DE ZOOM INTERMEDIO ---
     zoomSnap: 0.25,      // Permite pasos de zoom de 0.25 en 0.25 (ej: 15.25, 15.5, 15.75)
     zoomDelta: 0.25      // Define cuánto cambia el zoom al usar la rueda del mouse o la API
-}).setView([-34.6195, -58.4365], 15.5); // Ahora puedes pasar decimales directamente aquí
+}).setView([-34.6188, -58.4034], 15.5); // Ahora puedes pasar decimales directamente aquí
 // const map = L.map('map').setView([-34.63, -58.36], 15);
 // Variable para rastrear la capa actual
 let capaBaseActual = mapasBase['URBASUR'];
@@ -276,33 +276,56 @@ function getColor(id) {
 
 function dibujar(ids) {
     limpiarCapas(true, true);
+    
+    // Convertimos IDs a String/Números limpios para evaluar rangos
+    const esRutaUnica = ids.length === 1;
+    const primerIdNum = esRutaUnica ? parseInt(ids[0], 10) : null;
+    const esRango4000 = esRutaUnica && (primerIdNum >= 4000 && primerIdNum <= 4999);
+
+    // Set para no repetir la etiqueta de una misma calle en la misma vista
+    const callesEtiquetadas = new Set();
+
     const geo = L.geoJSON(misRutas, {
         filter: f => {
             const keys = Object.keys(f.properties);
             for(let i = 20; i < keys.length; i++) {
                 let val = String(f.properties[keys[i]]);
-                if(ids.includes(val) && val !== "null") { f._match = val; return true; }
+                if(ids.includes(val) && val !== "null") { 
+                    f._match = val; 
+                    return true; 
+                }
             }
             return false;
         },
         style: f => ({ 
-            // IMPORTANTE: f.feature._match o f._match según la versión. 
-            // Probemos con f._match que es donde lo guardaste en el filter.
-            color: ids.length === 1 ? "#e74c3c" : getColor(f._match || ""), 
+            color: esRutaUnica ? "#e74c3c" : getColor(f._match || ""), 
             weight: 8, 
             opacity: 0.8, 
             interactive: false 
-        })
+        }),
+
     }).addTo(capR);
     
-    let labels = new Set();
-    geo.eachLayer(l => {
-        if(!labels.has(l.feature._match)) {
-            L.marker(l.getBounds().getCenter(), { interactive: false, icon: L.divIcon({ className:'ruta-label', html: l.feature._match, iconSize:[null,null] }) }).addTo(capE);
-            labels.add(l.feature._match);
-        }
-    });
-    if(geo.getLayers().length) map.fitBounds(geo.getBounds(), {padding:[40,40]});  //vista del mapa, no del reporte
+    // REGLA 3: Mostrar etiquetas de NÚMERO DE RUTA solo si hay varias rutas seleccionadas (combo / servicio)
+    // (Se descarta si es ruta única, tanto fuera como dentro del rango 4000-4999)
+    if (!esRutaUnica) {
+        let labels = new Set();
+        geo.eachLayer(l => {
+            if(l.feature && l.feature._match && !labels.has(l.feature._match)) {
+                L.marker(l.getBounds().getCenter(), { 
+                    interactive: false, 
+                    icon: L.divIcon({ 
+                        className: 'ruta-label', 
+                        html: l.feature._match, 
+                        iconSize: [null, null] 
+                    }) 
+                }).addTo(capE);
+                labels.add(l.feature._match);
+            }
+        });
+    }
+
+    if(geo.getLayers().length) map.fitBounds(geo.getBounds(), {padding: [40, 40]});
 }
 
 function mostrarFicha(f) {
@@ -595,7 +618,7 @@ function busquedaGlobal() {
 function limpiarTodo() { 
     limpiarCapas(true, true); 
     document.getElementById('panel-der').classList.remove('active'); 
-    map.setView([-34.63, -58.36], 13);
+    map.setView([-34.6188, -58.4034], 13);
     document.querySelectorAll('input, select').forEach(el => el.value = "");
     ['dTur','dFre','dRut'].forEach(id=>document.getElementById(id).classList.add('hidden'));
 }
@@ -724,7 +747,7 @@ function generarInforme() {
     const ventana = window.open('', 'Reporte', 'width=1100,height=800');
 
     // =========================================================================
-    // CASO 1: REPORTE DE RUTA (FORMATO A3 LANDSCAPE CON CAJETÍN TÉCNICO)
+    // CASO 1: REPORTE DE RUTA (FORMATO A3 LANDSCAPE o AA Portrait)
     // =========================================================================
     if (esRuta) {
         const numRuta = obtenerValor("ruta") || contenido.querySelector('h3')?.innerText.replace(/[^0-9-]/g, '') || "";
@@ -756,6 +779,31 @@ function generarInforme() {
                         #marcomap {position: absolute; bottom: 42mm; right: 13mm; width: 184mm; height: 242mm; border: 1px solid #000000; z-index: 1;}
                         .leaflet-container, .leaflet-pane, .leaflet-tile-pane { background-color: #ffffff !important; }
                         
+                        .label-calle {
+                            background: transparent !important;
+                            border: none !important;
+                            box-shadow: none !important;
+                            font-family: Arial, sans-serif;
+                            font-size: 12pt;
+                            font-weight: bold;
+                            color: #c111111;
+                            text-shadow: 
+                                -1px -1px 0 #fff,  
+                                1px -1px 0 #fff,
+                                -1px  1px 0 #fff,
+                                1px  1px 0 #fff;
+                            padding: 8px 7px;
+                            white-space: nowrap;
+                        }
+
+                        /* Oculta las puntas o flechas indicadoras de los tooltips */
+                        .leaflet-tooltip-left::before,
+                        .leaflet-tooltip-right::before,
+                        .leaflet-tooltip-above::before,
+                        .leaflet-tooltip-below::before {
+                            display: none !important;
+                        }
+                            
                         .cajetin {
                             position: absolute;
                             bottom: 13mm;
@@ -873,7 +921,17 @@ function generarInforme() {
                             box-shadow: 0 2px 5px rgba(0,0,0,0.3);
                             font-size: 14px;
                         }
+                        
+                        /* Oculta las puntas o flechas indicadoras de los tooltips */
+                        .leaflet-tooltip-left::before,
+                        .leaflet-tooltip-right::before,
+                        .leaflet-tooltip-above::before,
+                        .leaflet-tooltip-below::before {
+                            display: none !important;
+                        }
+                            
                         @media print { body { background: none; } .page { margin: 0; box-shadow: none; } .btn-print { display: none; } }
+
                     </style>
                 </head>
                 <body>
@@ -934,9 +992,9 @@ function generarInforme() {
                             attributionControl: false,
                             zoomControl: false,
                             fadeAnimation: false,
-                            zoomSnap: 0.25,      // Permite pasos de zoom de 0.25 en 0.25 (ej: 15.25, 15.5, 15.75)
-                            zoomDelta: 0.25      // Define cuánto cambia el zoom al usar la rueda del mouse o la API
-                        }).setView([-34.6195, -58.4365], 15.5); // Ahora puedes pasar decimales directamente aquí
+                            zoomSnap: 0.25,
+                            zoomDelta: 0.25
+                        }).setView([-34.6188, -58.4034], 15.5);
 
                         L.control.attribution({prefix: false}).addTo(map);
 
@@ -949,9 +1007,23 @@ function generarInforme() {
                         const colsPuntos = ${typeof coloresPuntos !== 'undefined' ? JSON.stringify(coloresPuntos) : '{}'};
 
                         let layerLineas;
+                        const callesEtiquetadas = new Set(); // Evita repetidos en el mapa impreso
+
                         if(lineas.length > 0) {
                             layerLineas = L.geoJSON(lineas, { 
-                                style: { color: "#e74c3c", weight: 20, opacity: 0.6 } 
+                                style: { color: "#e74c3c", weight: 20, opacity: 0.6 },
+                                onEachFeature: (feature, layer) => {
+                                    const nombreCalle = feature.properties ? feature.properties.NOMOFICIAL : null;
+                                    
+                                    if (nombreCalle && nombreCalle.trim() !== "" && !callesEtiquetadas.has(nombreCalle)) {
+                                        layer.bindTooltip(nombreCalle, {
+                                            permanent: true,
+                                            direction: 'center',
+                                            className: 'label-calle'
+                                        });
+                                        callesEtiquetadas.add(nombreCalle);
+                                    }
+                                }
                             }).addTo(map);
                         }
 
@@ -970,7 +1042,7 @@ function generarInforme() {
                                 map.fitBounds(layerLineas.getBounds(), { padding: [45, 45] });
                             }, 350);
                         }
-                    <\/script>
+                    </script>
                 </body>
                 </html>
             `);
@@ -1067,7 +1139,7 @@ function generarInforme() {
                             fadeAnimation: false,
                             zoomSnap: 0.25,      // Permite pasos de zoom de 0.25 en 0.25 (ej: 15.25, 15.5, 15.75)
                             zoomDelta: 0.25      // Define cuánto cambia el zoom al usar la rueda del mouse o la API
-                        }).setView([-34.6195, -58.4365], 15.5); // Ahora puedes pasar decimales directamente aquí
+                        }).setView([-34.6188, -58.4034], 15.5); // Ahora puedes pasar decimales directamente aquí
                         L.control.attribution({prefix: false}).addTo(map);
 
                         L.tileLayer('Browser/teselas/{z}/{x}/{y}.png', {
