@@ -819,7 +819,7 @@ function generarInforme() {
                     const map = L.map('map', { zoomControl: false, attributionControl: false, fadeAnimation: false }).setView([-34.6195, -58.4365], 15);
                     L.control.attribution({prefix: false}).addTo(map);
 
-                    L.tileLayer('file:///E:/online/Consulta/Browser/Teselas/{z}/{x}/{y}.png', {
+                    L.tileLayer('Browser/teselas/{z}/{x}/{y}.png', {
                         minZoom: 3, maxZoom: 19, tms: false, attribution: 'Created by QGIS'
                     }).addTo(map);
 
