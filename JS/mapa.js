@@ -139,7 +139,16 @@ try {
 } catch(e) { console.error("Error cargando base de datos:", e); }
 
 // 2. Inicializar Mapa
-const map = L.map('map').setView([-34.63, -58.36], 15);
+var map = L.map('map', {
+    attributionControl: false,
+    zoomControl: false,
+    fadeAnimation: false,
+    
+    // --- CONTROL DE ZOOM INTERMEDIO ---
+    zoomSnap: 0.25,      // Permite pasos de zoom de 0.25 en 0.25 (ej: 15.25, 15.5, 15.75)
+    zoomDelta: 0.25      // Define cuánto cambia el zoom al usar la rueda del mouse o la API
+}).setView([-34.6195, -58.4365], 15.5); // Ahora puedes pasar decimales directamente aquí
+// const map = L.map('map').setView([-34.63, -58.36], 15);
 // Variable para rastrear la capa actual
 let capaBaseActual = mapasBase['URBASUR'];
 
@@ -694,7 +703,7 @@ function generarInforme() {
     }));
 
     const esRuta = contenido.innerHTML.includes("DETALLE RUTA");
-
+    const esRutaBarr = contenido.innerHTML.includes("DETALLE RUTA 4");
     // 3. OBTENCIÓN DE VALORES CLAVE
     const obtenerValor = (txt) => datosArray.find(d => d.label.toLowerCase().includes(txt.toLowerCase()))?.valor || "";
 
@@ -731,128 +740,371 @@ function generarInforme() {
         const versionVal = obtenerValor("Actualización") || "FECHA";
         const comunaVal = obtenerValor("comuna") || "0";
 
-        ventana.document.write(`
-            <!DOCTYPE html>
-            <html lang="es">
-            <head>
-                <meta charset="UTF-8">
-                <title>7${codservicioVal}${turnoVal}${numRuta}${frecuenciaVal}</title>
-                <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin=""/>
-                <style>
-                    @page { size: A3 landscape; margin: 0; }
-                    body { margin: 0; padding: 0; background-color: #525659; font-family: Arial, sans-serif; display: flex; justify-content: center; }
-                    .page { width: 420mm; height: 297mm; background: white; position: relative; box-sizing: border-box; margin: 20px auto; box-shadow: 0 0 15px rgba(0,0,0,0.5); overflow: hidden; }
-                    #map { position: absolute; bottom: 13mm; right: 13mm; width: 388mm; height: 270mm; border: 1.5px solid #000; background-color: #ffffff !important; z-index: 1; }
-                    .leaflet-container, .leaflet-pane, .leaflet-tile-pane { background-color: #ffffff !important; }
-                    
-                    /* CAJETÍN TÉCNICO */
-                    .cajetin { position: absolute; bottom: 13mm; right: 13mm; width: 98mm; height: 44mm; background: #ffffff; border: 1px solid #000000; z-index: 1000; display: flex; flex-direction: column; box-sizing: border-box; font-family: Arial, sans-serif; color: #000000; }
-                    .cajetin-row-1 { height: 9mm; border-bottom: 1px solid #000000; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; font-weight: bold; font-size: 9pt; line-height: 1.1; }
-                    .cajetin-row-2 { height: 10mm; border-bottom: 1px solid #000000; display: flex; justify-content: center; align-items: center; text-align: center; font-weight: normal; font-size: 10pt; letter-spacing: 0.2px; }
-                    .cajetin-body { height: 26mm; display: flex; }
-                    .cajetin-info { width: 74mm; display: flex; flex-direction: column; }
-                    .info-row { position: relative; display: flex; align-items: flex-end; border-bottom: 1px solid #000000; box-sizing: border-box; padding-bottom: 1mm; padding-left: 2mm; }
-                    .info-row-frecuencia { height: 9mm; padding-left: 12mm;}
-                    .info-row-turno { height: 9mm; padding-left: 12mm; }
-                    .info-row-bottom { height: 8mm; border-bottom: none; padding-bottom: 0; padding-left: 0; }
-                    .label-tech { position: absolute; top: 1px; left: 2px; font-family: 'Tahoma', sans-serif; font-size: 5pt; font-weight: bold; background: #e0e0e0; padding: 0px 2px; letter-spacing: 0.5px; }
-                    .value-text { font-size: 10pt; font-weight: normal; width: 100%; }
-                    .col-cell { position: relative; height: 100%; display: flex; align-items: flex-end; justify-content: center; border-right: 1px solid #000000; box-sizing: border-box; padding-bottom: 1mm; }
-                    .col-cell:last-child { border-right: none; }
-                    .col-version { width: 22mm; }
-                    .col-ruta { width: 40mm; }
-                    .col-comuna { width: 12mm; }
-                    .col-cell .value-text { text-align: center; font-size: 10pt; }
-                    .cajetin-logo { width: 24mm; height: 26mm; border-left: 1px solid #000000; display: flex; align-items: center; justify-content: center; padding: 1mm; box-sizing: border-box; }
-                    .cajetin-logo img { max-width: 100%; max-height: 100%; object-fit: contain; }
-                    
-                    .btn-print { position: fixed; top: 20px; left: 20px; padding: 12px 24px; background: #27ae60; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; z-index: 9999; box-shadow: 0 2px 5px rgba(0,0,0,0.3); font-size: 14px; }
-                    @media print { body { background: none; } .page { margin: 0; box-shadow: none; } .btn-print { display: none; } }
-                </style>
-            </head>
-            <body>
-                <button class="btn-print" onclick="window.print()">Imprimir / Guardar PDF (A3)</button>
-                <div class="page">
-                    <div id="map"></div>
-                    <div class="cajetin">
-                        <div class="cajetin-row-1">
-                            <div>SERVICIO PÚBLICO DE HIGIENE URBANA</div>
-                            <div>LICITACION PÚBLICA N 997/2013 - ZONA 07</div>
-                        </div>
-                        <div class="cajetin-row-2">
-                            ${servicioVal}
-                        </div>
-                        <div class="cajetin-body">
-                            <div class="cajetin-info">
-                                <div class="info-row info-row-frecuencia">
+        if (esRutaBarr) {
+            ventana.document.write(`
+                <!DOCTYPE html>
+                <html lang="es">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>7${codservicioVal}${turnoVal}${numRuta}${frecuenciaVal}</title>
+                    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin=""/>
+                    <style>
+                        @page { size: A4 portrait; margin: 0; }
+                        body { margin: 0; padding: 0; background-color: #525659; font-family: Arial, sans-serif; display: flex; justify-content: center; }
+                        .page { width: 210mm; height: 297mm; background: white; position: relative; box-sizing: border-box; margin: 20px auto; box-shadow: 0 0 15px rgba(0,0,0,0.5); overflow: hidden; }
+                        #map { position: absolute; bottom: 43mm; right: 14mm; width: 182mm; height: 240mm; border: 0px solid #000; background-color: #ffffff !important; z-index: 1; }
+                        #marcomap {position: absolute; bottom: 42mm; right: 13mm; width: 184mm; height: 242mm; border: 1px solid #000000; z-index: 1;}
+                        .leaflet-container, .leaflet-pane, .leaflet-tile-pane { background-color: #ffffff !important; }
+                        
+                        .cajetin {
+                            position: absolute;
+                            bottom: 13mm;
+                            right: 13mm;
+                            width: 184mm;
+                            height: 28mm;
+                            background: #ffffff;
+                            border: 1px solid #000000;
+                            z-index: 1000;
+                            box-sizing: border-box;
+                            display: grid;
+                            grid-template-columns: 80mm 1fr 24mm;
+                            font-family: Arial, Helvetica, sans-serif;
+                            color: #000000;
+                        }
+
+                        /* CELDAS DEL CAJETÍN */
+                        .cell {
+                            position: relative;
+                            border-right: 1px solid #000000;
+                            border-bottom: 1px solid #000000;
+                            box-sizing: border-box;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            text-align: center;
+                            padding: 1px 3px;
+                        }
+
+                        .cell-no-bottom { border-bottom: none; }
+                        .cell-no-right { border-right: none; }
+
+                        /* Columna 1 (Izquierda) */
+                        /* Columna 2 (Central Grid Interno) */
+                        .c1-row1 {
+                            grid-column: 1;
+                            grid-row: 1;
+                            font-size: 8pt;
+                            font-weight: bold;
+                            flex-direction: column;
+                            line-height: 1;
+                        }
+
+                        .c1-row2 {
+                            grid-column: 1;
+                            grid-row: 2 / span 2;
+                            font-size: 9pt;
+                            line-height: 1;
+                            text-transform: uppercase;
+                        }
+
+                        /* Columna 2 (Central Grid Interno) */
+                        .c2-grid {
+                            grid-column: 2;
+                            grid-row: 1 / span 3;
+                            display: grid;
+                            grid-template-columns: 1fr 22mm;
+                            grid-template-rows: 8mm 8mm 12mm;
+                        }
+
+                        /* Etiquetas técnicas grises superiores */
+                        .label-tech {
+                            position: absolute;
+                            top: 1px;
+                            left: 1px;
+                            font-family: Arial, sans-serif;
+                            font-size: 4.5pt;
+                            font-weight: bold;
+                            background: #dcdcdc;
+                            padding: 0px 2px;
+                            letter-spacing: 0.3px;
+                            text-transform: uppercase;
+                        }
+
+                        .val-text {
+                            font-size: 10pt;
+                            width: 100%;
+                        }
+
+                        /* RUTA (Texto Grande) */
+                        .val-ruta {
+                            font-size: 21pt;
+                            font-weight: bold;
+                            letter-spacing: 0.5px;
+                        }
+
+                        /* Columna 3 (Logo) */
+                        .c3-logo {
+                            grid-column: 3;
+                            grid-row: 1 / span 3;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            padding: 2px;
+                            box-sizing: border-box;
+                        }
+
+                        .c3-logo img {
+                            max-width: 95%;
+                            max-height: 95%;
+                            object-fit: contain;
+                        }
+                        .btn-print {
+                            position: fixed;
+                            top: 20px;
+                            left: 20px;
+                            padding: 12px 24px;
+                            background: #27ae60;
+                            color: white;
+                            border: none;
+                            border-radius: 4px;
+                            font-weight: bold;
+                            cursor: pointer;
+                            z-index: 9999;
+                            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+                            font-size: 14px;
+                        }
+                        @media print { body { background: none; } .page { margin: 0; box-shadow: none; } .btn-print { display: none; } }
+                    </style>
+                </head>
+                <body>
+                    <button class="btn-print" onclick="window.print()">Imprimir / Guardar PDF (A4)</button>
+                    <div class="page">
+                        <div id="marcomap"></div>
+                        <div id="map"></div>
+
+                        <!-- CAJETÍN TÉCNICO -->
+                        <div class="cajetin">
+                            <!-- Bloque Izquierdo -->
+                            <div class="cell c1-row1">
+                                <div>SERVICIO PÚBLICO DE HIGIENE URBANA</div>
+                                <div>LICITACION PÚBLICA Nº 997/2013 - ZONA 07</div>
+                            </div>
+                            <div class="cell c1-row2 cell-no-bottom">
+                                <span id="lblNombreServicio">${servicioVal}
+                            </div>
+                            <!-- Bloque Central -->
+                            <div class="c2-grid">
+                                <!-- Frecuencia -->
+                                <div class="cell" style="grid-column: 1; grid-row: 1;">
                                     <span class="label-tech">FRECUENCIA</span>
-                                    <div class="value-text" style="text-align: left;">${frecuenciaVal} - ${diasVal}</div>
+                                    <span class="val-text" id="lblFrecuencia">${frecuenciaVal} - ${diasVal}</span>
                                 </div>
-                                <div class="info-row info-row-turno">
+                                <!-- Versión -->
+                                <div class="cell" style="grid-column: 2; grid-row: 1;">
+                                    <span class="label-tech">VERSION</span>
+                                    <span class="val-text" id="lblVersion">${versionVal}</span>
+                                </div>
+                                <!-- Turno -->
+                                <div class="cell" style="grid-column: 1; grid-row: 2;">
                                     <span class="label-tech">TURNO</span>
-                                    <div class="value-text" style="text-align: left;">${turno} - ${horaVal} h</div>
+                                    <span class="val-text" id="lblTurno">${turno} - ${horaVal} h</span>
                                 </div>
-                                <div class="info-row info-row-bottom">
-                                    <div class="col-cell col-version">
-                                        <span class="label-tech">VERSION</span>
-                                        <span class="value-text">${versionVal}</span>
-                                    </div>
-                                    <div class="col-cell col-ruta">
-                                        <span class="label-tech">RUTA</span>
-                                        <span class="value-text">7${codservicioVal}${turnoVal}-${numRuta}-${frecuenciaVal}</span>
-                                    </div>
-                                    <div class="col-cell col-comuna">
-                                        <span class="label-tech">COMUNA</span>
-                                        <span class="value-text">${comunaVal}</span>
-                                    </div>
+                                <!-- Comuna -->
+                                <div class="cell" style="grid-column: 2; grid-row: 2;">
+                                    <span class="label-tech">COMUNA</span>
+                                    <span class="val-text" id="lblComuna">${comunaVal}</span>
+                                </div>
+                                <!-- Ruta -->
+                                <div class="cell cell-no-bottom" style="grid-column: 1 / span 2; grid-row: 3;">
+                                    <span class="label-tech">RUTA</span>
+                                    <span class="val-text val-ruta" id="lblRuta">7${codservicioVal}${turnoVal}-${numRuta}-${frecuenciaVal}</span>
                                 </div>
                             </div>
-                            <div class="cajetin-logo">
+
+                            <!-- Bloque Derecho (Logo) -->
+                            <div class="c3-logo cell-no-bottom">
                                 <img src="logo.png" alt="URBASUR" onerror="this.src='https://via.placeholder.com/100x100?text=URBASUR'">
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin=""></script>
-                <script>
-                    const map = L.map('map', { zoomControl: false, attributionControl: false, fadeAnimation: false }).setView([-34.6195, -58.4365], 15);
-                    L.control.attribution({prefix: false}).addTo(map);
+                    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin=""></script>
+                    <script>
+                        var map = L.map('map', {
+                            attributionControl: false,
+                            zoomControl: false,
+                            fadeAnimation: false,
+                            zoomSnap: 0.25,      // Permite pasos de zoom de 0.25 en 0.25 (ej: 15.25, 15.5, 15.75)
+                            zoomDelta: 0.25      // Define cuánto cambia el zoom al usar la rueda del mouse o la API
+                        }).setView([-34.6195, -58.4365], 15.5); // Ahora puedes pasar decimales directamente aquí
 
-                    L.tileLayer('Browser/teselas/{z}/{x}/{y}.png', {
-                        minZoom: 3, maxZoom: 19, tms: false, attribution: 'Created by QGIS'
-                    }).addTo(map);
+                        L.control.attribution({prefix: false}).addTo(map);
 
-                    const lineas = ${JSON.stringify(capasActivas)};
-                    const puntos = ${JSON.stringify(puntosParaInforme)};
-                    const colsPuntos = ${typeof coloresPuntos !== 'undefined' ? JSON.stringify(coloresPuntos) : '{}'};
-
-                    let layerLineas;
-                    if(lineas.length > 0) {
-                        layerLineas = L.geoJSON(lineas, { 
-                            style: { color: "#e74c3c", weight: 8, opacity: 0.6 } 
+                        L.tileLayer('Browser/teselas/{z}/{x}/{y}.png', {
+                            minZoom: 3, maxZoom: 19, tms: false
                         }).addTo(map);
-                    }
 
-                    puntos.forEach(gj => {
-                        L.geoJSON(gj, {
-                            pointToLayer: (f, latlng) => {
-                                let cod = (f.properties.COD_EQUIPA || "VERDE").toString().trim().toUpperCase();
-                                return L.circleMarker(latlng, { radius: 5, fillColor: colsPuntos[cod] || "#000", color: "#fff", weight: 1, fillOpacity: 0.9 });
-                            }
+                        const lineas = ${JSON.stringify(capasActivas)};
+                        const puntos = ${JSON.stringify(puntosParaInforme)};
+                        const colsPuntos = ${typeof coloresPuntos !== 'undefined' ? JSON.stringify(coloresPuntos) : '{}'};
+
+                        let layerLineas;
+                        if(lineas.length > 0) {
+                            layerLineas = L.geoJSON(lineas, { 
+                                style: { color: "#e74c3c", weight: 20, opacity: 0.6 } 
+                            }).addTo(map);
+                        }
+
+                        puntos.forEach(gj => {
+                            L.geoJSON(gj, {
+                                pointToLayer: (f, latlng) => {
+                                    let cod = (f.properties.COD_EQUIPA || "VERDE").toString().trim().toUpperCase();
+                                    return L.circleMarker(latlng, { radius: 5, fillColor: colsPuntos[cod] || "#000", color: "#fff", weight: 1, fillOpacity: 0.9 });
+                                }
+                            }).addTo(map);
+                        });
+
+                        if (layerLineas) {
+                            setTimeout(() => {
+                                map.invalidateSize();
+                                map.fitBounds(layerLineas.getBounds(), { padding: [45, 45] });
+                            }, 350);
+                        }
+                    <\/script>
+                </body>
+                </html>
+            `);
+        }
+        else {
+                        ventana.document.write(`
+                <!DOCTYPE html>
+                <html lang="es">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>7${codservicioVal}${turnoVal}${numRuta}${frecuenciaVal}</title>
+                    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin=""/>
+                    <style>
+                        @page { size: A3 landscape; margin: 0; }
+                        body { margin: 0; padding: 0; background-color: #525659; font-family: Arial, sans-serif; display: flex; justify-content: center; }
+                        .page { width: 420mm; height: 297mm; background: white; position: relative; box-sizing: border-box; margin: 20px auto; box-shadow: 0 0 15px rgba(0,0,0,0.5); overflow: hidden; }
+                        #map { position: absolute; bottom: 13mm; right: 13mm; width: 388mm; height: 270mm; border: 1.5px solid #000; background-color: #ffffff !important; z-index: 1; }
+                        .leaflet-container, .leaflet-pane, .leaflet-tile-pane { background-color: #ffffff !important; }
+                        
+                        /* CAJETÍN TÉCNICO */
+                        .cajetin { position: absolute; bottom: 13mm; right: 13mm; width: 98mm; height: 44mm; background: #ffffff; border: 1px solid #000000; z-index: 1000; display: flex; flex-direction: column; box-sizing: border-box; font-family: Arial, sans-serif; color: #000000; }
+                        .cajetin-row-1 { height: 9mm; border-bottom: 1px solid #000000; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; font-weight: bold; font-size: 9pt; line-height: 1.1; }
+                        .cajetin-row-2 { height: 10mm; border-bottom: 1px solid #000000; display: flex; justify-content: center; align-items: center; text-align: center; font-weight: normal; font-size: 10pt; letter-spacing: 0.2px; }
+                        .cajetin-body { height: 26mm; display: flex; }
+                        .cajetin-info { width: 74mm; display: flex; flex-direction: column; }
+                        .info-row { position: relative; display: flex; align-items: flex-end; border-bottom: 1px solid #000000; box-sizing: border-box; padding-bottom: 1mm; padding-left: 2mm; }
+                        .info-row-frecuencia { height: 9mm; padding-left: 12mm;}
+                        .info-row-turno { height: 9mm; padding-left: 12mm; }
+                        .info-row-bottom { height: 8mm; border-bottom: none; padding-bottom: 0; padding-left: 0; }
+                        .label-tech { position: absolute; top: 1px; left: 2px; font-family: 'Tahoma', sans-serif; font-size: 5pt; font-weight: bold; background: #e0e0e0; padding: 0px 2px; letter-spacing: 0.5px; }
+                        .value-text { font-size: 10pt; font-weight: normal; width: 100%; }
+                        .col-cell { position: relative; height: 100%; display: flex; align-items: flex-end; justify-content: center; border-right: 1px solid #000000; box-sizing: border-box; padding-bottom: 1mm; }
+                        .col-cell:last-child { border-right: none; }
+                        .col-version { width: 22mm; }
+                        .col-ruta { width: 40mm; }
+                        .col-comuna { width: 12mm; }
+                        .col-cell .value-text { text-align: center; font-size: 10pt; }
+                        .cajetin-logo { width: 24mm; height: 26mm; border-left: 1px solid #000000; display: flex; align-items: center; justify-content: center; padding: 1mm; box-sizing: border-box; }
+                        .cajetin-logo img { max-width: 100%; max-height: 100%; object-fit: contain; }
+                        
+                        .btn-print { position: fixed; top: 20px; left: 20px; padding: 12px 24px; background: #27ae60; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; z-index: 9999; box-shadow: 0 2px 5px rgba(0,0,0,0.3); font-size: 14px; }
+                        @media print { body { background: none; } .page { margin: 0; box-shadow: none; } .btn-print { display: none; } }
+                    </style>
+                </head>
+                <body>
+                    <button class="btn-print" onclick="window.print()">Imprimir / Guardar PDF (A3)</button>
+                    <div class="page">
+                        <div id="map"></div>
+                        <div class="cajetin">
+                            <div class="cajetin-row-1">
+                                <div>SERVICIO PÚBLICO DE HIGIENE URBANA</div>
+                                <div>LICITACION PÚBLICA N 997/2013 - ZONA 07</div>
+                            </div>
+                            <div class="cajetin-row-2">
+                                ${servicioVal}
+                            </div>
+                            <div class="cajetin-body">
+                                <div class="cajetin-info">
+                                    <div class="info-row info-row-frecuencia">
+                                        <span class="label-tech">FRECUENCIA</span>
+                                        <div class="value-text" style="text-align: left;">${frecuenciaVal} - ${diasVal}</div>
+                                    </div>
+                                    <div class="info-row info-row-turno">
+                                        <span class="label-tech">TURNO</span>
+                                        <div class="value-text" style="text-align: left;">${turno} - ${horaVal} h</div>
+                                    </div>
+                                    <div class="info-row info-row-bottom">
+                                        <div class="col-cell col-version">
+                                            <span class="label-tech">VERSION</span>
+                                            <span class="value-text">${versionVal}</span>
+                                        </div>
+                                        <div class="col-cell col-ruta">
+                                            <span class="label-tech">RUTA</span>
+                                            <span class="value-text">7${codservicioVal}${turnoVal}-${numRuta}-${frecuenciaVal}</span>
+                                        </div>
+                                        <div class="col-cell col-comuna">
+                                            <span class="label-tech">COMUNA</span>
+                                            <span class="value-text">${comunaVal}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="cajetin-logo">
+                                    <img src="logo.png" alt="URBASUR" onerror="this.src='https://via.placeholder.com/100x100?text=URBASUR'">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin=""></script>
+                    <script>
+                        var map = L.map('map', {
+                            attributionControl: false,
+                            zoomControl: false,
+                            fadeAnimation: false,
+                            zoomSnap: 0.25,      // Permite pasos de zoom de 0.25 en 0.25 (ej: 15.25, 15.5, 15.75)
+                            zoomDelta: 0.25      // Define cuánto cambia el zoom al usar la rueda del mouse o la API
+                        }).setView([-34.6195, -58.4365], 15.5); // Ahora puedes pasar decimales directamente aquí
+                        L.control.attribution({prefix: false}).addTo(map);
+
+                        L.tileLayer('Browser/teselas/{z}/{x}/{y}.png', {
+                            minZoom: 3, maxZoom: 19, tms: false
                         }).addTo(map);
-                    });
 
-                    if (layerLineas) {
-                        setTimeout(() => {
-                            map.invalidateSize();
-                            map.fitBounds(layerLineas.getBounds(), { padding: [45, 45] });
-                        }, 350);
-                    }
-                <\/script>
-            </body>
-            </html>
-        `);
+                        const lineas = ${JSON.stringify(capasActivas)};
+                        const puntos = ${JSON.stringify(puntosParaInforme)};
+                        const colsPuntos = ${typeof coloresPuntos !== 'undefined' ? JSON.stringify(coloresPuntos) : '{}'};
+
+                        let layerLineas;
+                        if(lineas.length > 0) {
+                            layerLineas = L.geoJSON(lineas, { 
+                                style: { color: "#e74c3c", weight: 8, opacity: 0.6 } 
+                            }).addTo(map);
+                        }
+
+                        puntos.forEach(gj => {
+                            L.geoJSON(gj, {
+                                pointToLayer: (f, latlng) => {
+                                    let cod = (f.properties.COD_EQUIPA || "VERDE").toString().trim().toUpperCase();
+                                    return L.circleMarker(latlng, { radius: 5, fillColor: colsPuntos[cod] || "#000", color: "#fff", weight: 1, fillOpacity: 0.9 });
+                                }
+                            }).addTo(map);
+                        });
+
+                        if (layerLineas) {
+                            setTimeout(() => {
+                                map.invalidateSize();
+                                map.fitBounds(layerLineas.getBounds(), { padding: [45, 45] });
+                            }, 350);
+                        }
+                    <\/script>
+                </body>
+                </html>
+            `);
+        }
     } 
     // =========================================================================
     // CASO 2: REPORTE DE CUADRA (FORMATO A4 VERTICAL ESTÁNDAR)
@@ -916,7 +1168,7 @@ function generarInforme() {
                 <script>
                     const map = L.map('map-static', { zoomControl: false, attributionControl: false, fadeAnimation: false });
                     L.tileLayer('file:///E:/online/Consulta/Browser/Teselas/{z}/{x}/{y}.png', {
-                        minZoom: 3, maxZoom: 19, tms: false, attribution: 'Created by QGIS'
+                        minZoom: 3, maxZoom: 19, tms: false
                     }).addTo(map);
 
                     const lineas = ${JSON.stringify(capasActivas)};
