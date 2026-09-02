@@ -994,7 +994,7 @@ function generarInforme() {
                             fadeAnimation: false,
                             zoomSnap: 0.25,
                             zoomDelta: 0.25
-                        }).setView([-34.6188, -58.4034], 15.5);
+                        }).setView([-34.6195, -58.4365], 15.5);
 
                         L.control.attribution({prefix: false}).addTo(map);
 
@@ -1007,21 +1007,85 @@ function generarInforme() {
                         const colsPuntos = ${typeof coloresPuntos !== 'undefined' ? JSON.stringify(coloresPuntos) : '{}'};
 
                         let layerLineas;
-                        const callesEtiquetadas = new Set(); // Evita repetidos en el mapa impreso
+                        const callesEtiquetadas = new Set();
 
                         if(lineas.length > 0) {
                             layerLineas = L.geoJSON(lineas, { 
-                                style: { color: "#e74c3c", weight: 20, opacity: 0.6 },
+                                style: { color: "#e74c3c", weight: 23, opacity: 0.8 },
                                 onEachFeature: (feature, layer) => {
                                     const nombreCalle = feature.properties ? feature.properties.NOMOFICIAL : null;
                                     
                                     if (nombreCalle && nombreCalle.trim() !== "" && !callesEtiquetadas.has(nombreCalle)) {
-                                        layer.bindTooltip(nombreCalle, {
-                                            permanent: true,
-                                            direction: 'center',
-                                            className: 'label-calle'
-                                        });
                                         callesEtiquetadas.add(nombreCalle);
+
+                                        // Agregamos el texto alineado al vector una vez que la capa se añade al mapa
+                                        layer.on('add', function() {
+                                            const originalPath = layer._path;
+                                            if (!originalPath) return;
+
+                                            let latlngs = layer.getLatLngs();
+                                            if (Array.isArray(latlngs[0])) latlngs = latlngs[0];
+                                            if (!latlngs || latlngs.length < 2) return;
+
+                                            // Proyección a pantalla únicamente para calcular el ángulo
+                                            const p1 = map.latLngToContainerPoint(latlngs[0]);
+                                            const p2 = map.latLngToContainerPoint(latlngs[latlngs.length - 1]);
+
+                                            // Ángulo de inclinación del tramo (-180° a 180°)
+                                            let angulo = Math.atan2(p2.y - p1.y, p2.x - p1.x) * (180 / Math.PI);
+                                            const estaBocaAbajo = angulo > 90 || angulo < -90;
+
+                                            const svg = map.getPanes().overlayPane.querySelector('svg');
+                                            if (!svg) return;
+
+                                            let targetPathId = 'path-calle-' + Math.random().toString(36).substr(2, 9);
+
+                                            if (estaBocaAbajo) {
+                                                // Invertimos las coordenadas geográficas (LatLng)
+                                                const latlngsInvertidos = [...latlngs].reverse();
+
+                                                // Creamos una polilínea transparente paralela con la dirección invertida
+                                                const polylineInv = L.polyline(latlngsInvertidos, {
+                                                    stroke: false,
+                                                    fill: false,
+                                                    interactive: false
+                                                }).addTo(map);
+
+                                                // Asignamos el ID al path de la polilínea invertida generada por Leaflet
+                                                if (polylineInv._path) {
+                                                    polylineInv._path.setAttribute('id', targetPathId);
+                                                } else {
+                                                    // Fallback por si aún no se renderizó la polilínea en el DOM
+                                                    originalPath.setAttribute('id', targetPathId);
+                                                }
+                                            } else {
+                                                originalPath.setAttribute('id', targetPathId);
+                                            }
+
+                                            // Creación de la etiqueta de texto
+                                            const textNode = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                                            textNode.setAttribute('dy', '3'); 
+
+                                            // --- REGLAS CLAVE PARA EVITAR RECORTE Y MANTENER TAMAÑO ---
+                                            textNode.style.overflow = 'visible'; // Evita el recortes de bordes en el texto
+                                            textNode.style.fontSize = '10pt';     // Tamaño de fuente original fijo
+                                            textNode.style.fontWeight = 'bold';
+                                            textNode.style.fontFamily = 'Arial, sans-serif';
+                                            textNode.style.fill = '#111111';
+                                            textNode.style.stroke = '#ffffff';
+                                            textNode.style.strokeWidth = '2px';
+                                            textNode.style.strokeLinejoin = 'round';
+                                            textNode.style.paintOrder = 'stroke fill';
+
+                                            const textPath = document.createElementNS('http://www.w3.org/2000/svg', 'textPath');
+                                            textPath.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', '#' + targetPathId);
+                                            textPath.setAttribute('startOffset', '50%');
+                                            textPath.setAttribute('text-anchor', 'middle');
+                                            textPath.textContent = nombreCalle;
+
+                                            textNode.appendChild(textPath);
+                                            svg.appendChild(textNode);
+                                        });
                                     }
                                 }
                             }).addTo(map);
@@ -1153,7 +1217,7 @@ function generarInforme() {
                         let layerLineas;
                         if(lineas.length > 0) {
                             layerLineas = L.geoJSON(lineas, { 
-                                style: { color: "#e74c3c", weight: 8, opacity: 0.6 } 
+                                style: { color: "#e74c3c", weight: 10, opacity: 0.7 } 
                             }).addTo(map);
                         }
 
